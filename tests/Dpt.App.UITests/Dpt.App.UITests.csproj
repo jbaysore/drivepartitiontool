@@ -18,7 +18,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Dpt.App\Dpt.App.csproj" />
+    <ProjectReference Include="..\..\src\Dpt.App\Dpt.App.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\src\Dpt.Shell\Dpt.Shell.csproj" />
   </ItemGroup>
 
 </Project>
+

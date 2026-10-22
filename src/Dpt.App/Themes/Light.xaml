@@ -1,0 +1,19 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Mirrors the CSS variables in docs/ui/ui-first-pass.html (light). -->
+    <SolidColorBrush x:Key="DptWindow" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="DptRail" Color="#F7F8FA" />
+    <SolidColorBrush x:Key="DptPanel" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="DptPanelSoft" Color="#F0F2F6" />
+    <SolidColorBrush x:Key="DptInk" Color="#22252B" />
+    <SolidColorBrush x:Key="DptMuted" Color="#68717F" />
+    <SolidColorBrush x:Key="DptBorder" Color="#E4E6EB" />
+    <SolidColorBrush x:Key="DptAccent" Color="#646FD0" />
+    <SolidColorBrush x:Key="DptAccentSoft" Color="#F0F1FF" />
+    <SolidColorBrush x:Key="DptGreen" Color="#347C61" />
+    <SolidColorBrush x:Key="DptRed" Color="#B84F56" />
+    <SolidColorBrush x:Key="DptAmber" Color="#9A6A12" />
+    <SolidColorBrush x:Key="DptSelection" Color="#E3E6FB" />
+    <SolidColorBrush x:Key="DptHover" Color="#F3F4F8" />
+    <SolidColorBrush x:Key="DptCloseHover" Color="#C42B1C" />
+</ResourceDictionary>

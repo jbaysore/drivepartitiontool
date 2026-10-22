@@ -1,0 +1,224 @@
+<UserControl x:Class="Dpt.App.Views.HomeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:Dpt.App.Controls"
+             AutomationProperties.AutomationId="HomeView">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="26,24,26,27" MaxWidth="1100" HorizontalAlignment="Stretch">
+            <TextBlock Text="Home" Style="{StaticResource PageTitle}" />
+            <TextBlock Text="Find something or pick up where you left off." Style="{StaticResource Muted}" Margin="0,0,0,20" />
+
+            <!-- Large search -->
+            <Border BorderBrush="{DynamicResource DptBorder}" BorderThickness="1" CornerRadius="9" Background="{DynamicResource DptPanel}" MinHeight="48" Padding="14,0">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.06" />
+                </Border.Effect>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <c:Icon Data="{StaticResource Icon.Search}" Size="17" Foreground="{DynamicResource DptMuted}" />
+                    <TextBlock Grid.Column="1" Margin="11,0,0,0" FontSize="14" Text="Search files, folders, types, sizes, dates…" Foreground="{DynamicResource DptMuted}"
+                               VerticalAlignment="Center" IsHitTestVisible="False"
+                               Visibility="{Binding Text, ElementName=HomeSearchBox, Converter={StaticResource NullToVisible}}" />
+                    <TextBox x:Name="HomeSearchBox" Grid.Column="1" Margin="11,0,0,0" FontSize="14" Style="{StaticResource BareTextBox}" MinHeight="46"
+                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.AutomationId="HomeSearchBox">
+                        <TextBox.InputBindings>
+                            <KeyBinding Key="Enter" Command="{Binding SearchCommand}" />
+                        </TextBox.InputBindings>
+                    </TextBox>
+                    <Border Grid.Column="2" BorderBrush="{DynamicResource DptBorder}" BorderThickness="1,0,0,0" Padding="12,0,0,0" Margin="12,12">
+                        <TextBlock Text="All selected drives" FontSize="12" VerticalAlignment="Center" />
+                    </Border>
+                </Grid>
+            </Border>
+
+            <Grid Margin="0,25,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="30" />
+                    <ColumnDefinition Width="0.86*" MinWidth="220" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel>
+                    <!-- Pinned -->
+                    <DockPanel Margin="0,0,0,9">
+                        <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Command="{Binding ToggleManagePinsCommand}" AutomationProperties.AutomationId="ManagePins">
+                            <TextBlock>
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="Manage" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsManagingPins}" Value="True">
+                                                <Setter Property="Text" Value="Done" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Button>
+                        <TextBlock Text="Pinned locations" Style="{StaticResource H2}" />
+                    </DockPanel>
+                    <TextBlock Text="Pin folders from a folder's toolbar or right-click menu." Style="{StaticResource Small}" Margin="0,0,0,12"
+                               Visibility="{Binding HasPins, Converter={StaticResource BoolToCollapsed}}" />
+                    <ItemsControl ItemsSource="{Binding Pins}" Margin="0,0,0,23" AutomationProperties.AutomationId="HomePins">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Button Style="{StaticResource RowButton}" ToolTip="{Binding Path}" AutomationProperties.Name="{Binding Label}"
+                                            Command="{Binding DataContext.OpenLocationCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding Path}">
+                                        <Button.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Open in new tab" Command="{Binding PlacementTarget.Tag.OpenLocationInNewTabCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="{Binding Path}" />
+                                                <MenuItem Header="Rename pin…" Command="{Binding PlacementTarget.Tag.RenamePinCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="{Binding Path}" />
+                                                <MenuItem Header="Unpin" Command="{Binding PlacementTarget.Tag.UnpinCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="{Binding Path}" />
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                        <Button.Tag>
+                                            <Binding Path="DataContext" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                                        </Button.Tag>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <c:Icon Data="{StaticResource Icon.Pin}" Foreground="{DynamicResource DptMuted}" />
+                                            <TextBlock Grid.Column="1" Margin="10,0" Text="{Binding Label}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Text="{Binding Meta}" Style="{StaticResource Small}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                        </Grid>
+                                    </Button>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,30,0"
+                                                Visibility="{Binding DataContext.IsManagingPins, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisible}}">
+                                        <Button Style="{StaticResource IconButton}" Width="26" Height="26" ToolTip="Move up"
+                                                Command="{Binding DataContext.MovePinUpCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding Path}">
+                                            <c:Icon Data="{StaticResource Icon.ArrowUp}" Size="13" />
+                                        </Button>
+                                        <Button Style="{StaticResource IconButton}" Width="26" Height="26" ToolTip="Move down"
+                                                Command="{Binding DataContext.MovePinDownCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding Path}">
+                                            <c:Icon Data="{StaticResource Icon.ArrowUp}" Size="13" RenderTransformOrigin="0.5,0.5">
+                                                <c:Icon.RenderTransform>
+                                                    <RotateTransform Angle="180" />
+                                                </c:Icon.RenderTransform>
+                                            </c:Icon>
+                                        </Button>
+                                        <Button Style="{StaticResource IconButton}" Width="26" Height="26" ToolTip="Rename"
+                                                Command="{Binding DataContext.RenamePinCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding Path}">
+                                            <c:Icon Data="{StaticResource Icon.Pencil}" Size="13" />
+                                        </Button>
+                                        <Button Style="{StaticResource IconButton}" Width="26" Height="26" ToolTip="Unpin"
+                                                Command="{Binding DataContext.UnpinCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding Path}">
+                                            <c:Icon Data="{StaticResource Icon.X}" Size="13" />
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Frequently visited -->
+                    <DockPanel Margin="0,0,0,9">
+                        <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="See all" Command="{Binding SeeAllFrequentCommand}" />
+                        <TextBlock Text="Frequently visited" Style="{StaticResource H2}" />
+                    </DockPanel>
+                    <TextBlock Text="Folders you open often will appear here." Style="{StaticResource Small}"
+                               Visibility="{Binding HasFrequent, Converter={StaticResource BoolToCollapsed}}" />
+                    <ItemsControl ItemsSource="{Binding Frequent}" AutomationProperties.AutomationId="HomeFrequent">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Style="{StaticResource RowButton}" ToolTip="{Binding Path}" AutomationProperties.Name="{Binding Label}"
+                                        Command="{Binding DataContext.OpenLocationCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding Path}"
+                                        Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                    <Button.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Open in new tab" Command="{Binding PlacementTarget.Tag.OpenLocationInNewTabCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="{Binding Path}" />
+                                            <MenuItem Header="Remove from this list" Command="{Binding PlacementTarget.Tag.ForgetFrequentCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="{Binding Path}" />
+                                        </ContextMenu>
+                                    </Button.ContextMenu>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <c:Icon Data="{StaticResource Icon.Clock}" Foreground="{DynamicResource DptMuted}" />
+                                        <StackPanel Grid.Column="1" Margin="10,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" Text="{Binding Meta}" Style="{StaticResource Small}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                    </Grid>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2">
+                    <!-- Drive space -->
+                    <StackPanel Visibility="{Binding ShowDrives, Converter={StaticResource BoolToVisible}}" Margin="0,0,0,23">
+                        <DockPanel Margin="0,0,0,9">
+                            <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="View drives" Command="{Binding ViewDrivesCommand}" />
+                            <TextBlock Text="Drive space" Style="{StaticResource H2}" />
+                        </DockPanel>
+                        <ItemsControl ItemsSource="{Binding Drives}" AutomationProperties.AutomationId="HomeDrives">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Style="{StaticResource RowButton}" Padding="0" MinHeight="0"
+                                            Command="{Binding DataContext.OpenLocationCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding Root}">
+                                        <StackPanel Margin="0,4,0,12">
+                                            <DockPanel Margin="0,0,0,7">
+                                                <TextBlock DockPanel.Dock="Right" Text="{Binding FreeText}" Style="{StaticResource Small}" VerticalAlignment="Center" />
+                                                <StackPanel Orientation="Horizontal">
+                                                    <c:Icon Data="{StaticResource Icon.HardDrive}" Foreground="{DynamicResource DptMuted}" />
+                                                    <TextBlock Margin="8,0,0,0" FontWeight="Medium" VerticalAlignment="Center">
+                                                        <Run Text="{Binding Label, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Letter, Mode=OneWay}" />
+                                                    </TextBlock>
+                                                </StackPanel>
+                                            </DockPanel>
+                                            <ProgressBar Style="{StaticResource Meter}" Value="{Binding UsedFraction, Mode=OneWay}"
+                                                         Foreground="{Binding UsedFraction, Converter={StaticResource UsageBrush}}" />
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <!-- Largest items -->
+                    <StackPanel Visibility="{Binding ShowLargest, Converter={StaticResource BoolToVisible}}">
+                        <DockPanel Margin="0,0,0,9">
+                            <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="See all" Command="{Binding ViewLargestCommand}" />
+                            <TextBlock Text="Largest items" Style="{StaticResource H2}" />
+                        </DockPanel>
+                        <TextBlock Text="{Binding LargestNote}" Style="{StaticResource Small}" TextWrapping="Wrap"
+                                   Visibility="{Binding HasLargest, Converter={StaticResource BoolToCollapsed}}" />
+                        <ItemsControl ItemsSource="{Binding Largest}" AutomationProperties.AutomationId="HomeLargest">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Style="{StaticResource RowButton}" ToolTip="{Binding Path}"
+                                            Command="{Binding DataContext.OpenItemLocationCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding Path}">
+                                        <Grid Margin="0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition />
+                                                <RowDefinition />
+                                            </Grid.RowDefinitions>
+                                            <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="1" Text="{Binding SizeText}" Margin="10,0,0,0" />
+                                            <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Path}" Style="{StaticResource Small}" TextTrimming="CharacterEllipsis" />
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

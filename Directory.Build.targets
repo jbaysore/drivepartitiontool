@@ -1,0 +1,6 @@
+﻿<Project>
+  <ItemGroup>
+    <!-- WPF projects remove System.IO from implicit usings (in SDK targets); add it back after them. -->
+    <Using Include="System.IO" />
+  </ItemGroup>
+</Project>

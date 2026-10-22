@@ -1,0 +1,194 @@
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media;
+using Dpt.App.Services;
+using Dpt.App.ViewModels;
+using Dpt.Shell;
+
+namespace Dpt.App.Views;
+
+public partial class MainWindow : Window
+{
+    private const int WM_DEVICECHANGE = 0x0219;
+    private Point _tabDragStart;
+    private TabViewModel? _dragTab;
+
+    public MainWindow()
+    {
+        InitializeComponent();
+        SourceInitialized += OnSourceInitialized;
+        StateChanged += (_, _) => UpdateMaximizedState();
+        PreviewKeyDown += OnPreviewKeyDown;
+        PreviewMouseDown += (_, e) =>
+        {
+            // Mouse back/forward buttons, like File Explorer and browsers.
+            var tab = Vm?.SelectedTab;
+            if (e.ChangedButton == MouseButton.XButton1 && tab?.BackCommand.CanExecute(null) == true) tab.BackCommand.Execute(null);
+            else if (e.ChangedButton == MouseButton.XButton2 && tab?.ForwardCommand.CanExecute(null) == true) tab.ForwardCommand.Execute(null);
+        };
+        Closing += (_, _) => (DataContext as MainViewModel)?.SaveTabs();
+    }
+
+    private MainViewModel? Vm => DataContext as MainViewModel;
+
+    private void OnSourceInitialized(object? sender, EventArgs e)
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        AppServices.Current.OwnerWindow = hwnd;
+        HwndSource.FromHwnd(hwnd)?.AddHook(WndProc);
+    }
+
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WM_DEVICECHANGE)
+            Dispatcher.BeginInvoke(() => AppServices.Current.Drives.Refresh());
+        var result = ShellContextMenu.HandleWindowMessage(hwnd, msg, wParam, lParam, ref handled);
+        return handled ? result : IntPtr.Zero;
+    }
+
+    private void UpdateMaximizedState()
+    {
+        // With a custom chrome, a maximized window extends past the screen edge by the resize border.
+        RootBorder.BorderThickness = WindowState == WindowState.Maximized ? new Thickness(7) : new Thickness(1);
+        MaxIcon.Data = (Geometry)FindResource(WindowState == WindowState.Maximized ? "Icon.Restore" : "Icon.Maximize");
+    }
+
+    private void OnMinimize(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
+    private void OnMaximize(object sender, RoutedEventArgs e) =>
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+
+    private void OnClose(object sender, RoutedEventArgs e) => Close();
+
+    private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        var ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+        var alt = Keyboard.Modifiers.HasFlag(ModifierKeys.Alt);
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        var tab = Vm?.SelectedTab;
+        // Navigation keys are handled on the way down, before lists and text boxes consume arrow keys.
+        if ((alt && key == Key.Left) || key == Key.BrowserBack)
+        {
+            if (tab?.BackCommand.CanExecute(null) == true) tab.BackCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
+
+        if ((alt && key == Key.Right) || key == Key.BrowserForward)
+        {
+            if (tab?.ForwardCommand.CanExecute(null) == true) tab.ForwardCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
+
+        if (alt && key == Key.Up)
+        {
+            if (tab?.UpCommand.CanExecute(null) == true) tab.UpCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
+
+        if ((ctrl && key == Key.L) || (alt && key == Key.D) || key == Key.F4 && !ctrl && !alt)
+        {
+            Vm?.SelectedTab?.EditAddressCommand.Execute(null);
+            e.Handled = true;
+        }
+        else if ((ctrl && (key == Key.F || key == Key.E)) || key == Key.F3)
+        {
+            FocusSearch();
+            e.Handled = true;
+        }
+        else if (ctrl && key >= Key.D1 && key <= Key.D9 && Vm is { } vm)
+        {
+            var index = key == Key.D9 ? vm.Tabs.Count - 1 : key - Key.D1;
+            if (index < vm.Tabs.Count) vm.SelectedTab = vm.Tabs[index];
+            e.Handled = true;
+        }
+    }
+
+    public void FocusSearch()
+    {
+        if (Vm?.SelectedTab?.IsHome == true)
+        {
+            // Home has its own large search box.
+            var box = FindDescendant<TextBox>(this, t => t.Name == "HomeSearchBox");
+            box?.Focus();
+            box?.SelectAll();
+            return;
+        }
+
+        TabSearchBox.Focus();
+        TabSearchBox.SelectAll();
+    }
+
+    private void OnAddressClick(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject d && FindAncestor<Button>(d) is not null) return;
+        Vm?.SelectedTab?.EditAddressCommand.Execute(null);
+    }
+
+    private void OnAddressVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (AddressBox.IsVisible)
+            Dispatcher.BeginInvoke(() =>
+            {
+                AddressBox.Focus();
+                AddressBox.SelectAll();
+            });
+    }
+
+    private void OnAddressLostFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (Vm?.SelectedTab is { IsEditingAddress: true } tab) tab.CancelAddressCommand.Execute(null);
+    }
+
+    // ----- Tab strip: drag to reorder, middle-click to close -----
+
+    private void OnTabMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        _tabDragStart = e.GetPosition(TabStrip);
+        _dragTab = (e.OriginalSource as DependencyObject) is { } d ? (FindAncestor<ListBoxItem>(d)?.DataContext as TabViewModel) : null;
+    }
+
+    private void OnTabMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_dragTab is null || e.LeftButton != MouseButtonState.Pressed || Vm is null) return;
+        var pos = e.GetPosition(TabStrip);
+        if (Math.Abs(pos.X - _tabDragStart.X) < SystemParameters.MinimumHorizontalDragDistance) return;
+        var over = TabStrip.InputHitTest(new Point(pos.X, TabStrip.ActualHeight / 2)) as DependencyObject;
+        if (over is not null && FindAncestor<ListBoxItem>(over)?.DataContext is TabViewModel target && target != _dragTab)
+        {
+            Vm.MoveTab(_dragTab, Vm.Tabs.IndexOf(target));
+            Vm.SelectedTab = _dragTab;
+        }
+    }
+
+    private void OnTabMouseUp(object sender, MouseButtonEventArgs e) => _dragTab = null;
+
+    private void OnTabMiddleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Middle || e.OriginalSource is not DependencyObject d) return;
+        if (FindAncestor<ListBoxItem>(d)?.DataContext is TabViewModel tab) Vm?.CloseTabCommand.Execute(tab);
+    }
+
+    public static T? FindAncestor<T>(DependencyObject? d) where T : DependencyObject
+    {
+        while (d is not null and not T) d = d is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d);
+        return d as T;
+    }
+
+    public static T? FindDescendant<T>(DependencyObject root, Func<T, bool> match) where T : DependencyObject
+    {
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T t && match(t)) return t;
+            if (FindDescendant(child, match) is { } found) return found;
+        }
+
+        return null;
+    }
+}

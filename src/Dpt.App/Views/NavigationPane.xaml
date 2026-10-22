@@ -1,0 +1,131 @@
+﻿<UserControl x:Class="Dpt.App.Views.NavigationPane"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:Dpt.App.Controls"
+             AutomationProperties.AutomationId="NavigationPane">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10,14">
+        <StackPanel>
+            <StackPanel Margin="0,0,0,19">
+                <Button Style="{StaticResource NavButton}" Command="{Binding GoToCommand}" CommandParameter="Home" AutomationProperties.AutomationId="NavHome"
+                        Tag="{Binding ActiveKind, Converter={StaticResource Equals}, ConverterParameter=Home}">
+                    <StackPanel Orientation="Horizontal">
+                        <c:Icon Data="{StaticResource Icon.Home}" />
+                        <TextBlock Text="Home" Margin="9,0,0,0" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource NavButton}" Command="{Binding GoToCommand}" CommandParameter="Search" AutomationProperties.AutomationId="NavSearch"
+                        Tag="{Binding ActiveKind, Converter={StaticResource Equals}, ConverterParameter=Search}">
+                    <StackPanel Orientation="Horizontal">
+                        <c:Icon Data="{StaticResource Icon.Search}" />
+                        <TextBlock Text="Search" Margin="9,0,0,0" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource NavButton}" Command="{Binding GoToCommand}" CommandParameter="LargestItems" AutomationProperties.AutomationId="NavLargest"
+                        Tag="{Binding ActiveKind, Converter={StaticResource Equals}, ConverterParameter=LargestItems}">
+                    <StackPanel Orientation="Horizontal">
+                        <c:Icon Data="{StaticResource Icon.ChartPie}" />
+                        <TextBlock Text="Largest items" Margin="9,0,0,0" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource NavButton}" Command="{Binding GoToCommand}" CommandParameter="Drives" AutomationProperties.AutomationId="NavDrives"
+                        Tag="{Binding ActiveKind, Converter={StaticResource Equals}, ConverterParameter=Drives}">
+                    <StackPanel Orientation="Horizontal">
+                        <c:Icon Data="{StaticResource Icon.HardDrive}" />
+                        <TextBlock Text="Drives" Margin="9,0,0,0" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource NavButton}" Command="{Binding GoToCommand}" CommandParameter="Rules" AutomationProperties.AutomationId="NavRules"
+                        Tag="{Binding ActiveKind, Converter={StaticResource Equals}, ConverterParameter=Rules}">
+                    <StackPanel Orientation="Horizontal">
+                        <c:Icon Data="{StaticResource Icon.ListFilter}" />
+                        <TextBlock Text="Rules &amp; categories" Margin="9,0,0,0" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource NavButton}" Command="{Binding GoToCommand}" CommandParameter="Layouts" AutomationProperties.AutomationId="NavLayouts"
+                        Tag="{Binding ActiveKind, Converter={StaticResource Equals}, ConverterParameter=Layouts}">
+                    <StackPanel Orientation="Horizontal">
+                        <c:Icon Data="{StaticResource Icon.Layout}" />
+                        <TextBlock Text="Folder layouts" Margin="9,0,0,0" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource NavButton}" Command="{Binding GoToCommand}" CommandParameter="DiskTools" AutomationProperties.AutomationId="NavDiskTools"
+                        Tag="{Binding ActiveKind, Converter={StaticResource Equals}, ConverterParameter=DiskTools}">
+                    <StackPanel Orientation="Horizontal">
+                        <c:Icon Data="{StaticResource Icon.Sliders}" />
+                        <TextBlock Text="Disk tools" Margin="9,0,0,0" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+            <TextBlock Text="PINNED" Style="{StaticResource SectionHeading}" />
+            <ItemsControl ItemsSource="{Binding Pins}" Margin="0,0,0,19" AutomationProperties.AutomationId="NavPins">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Button Style="{StaticResource NavButton}" ToolTip="{Binding Path}"
+                                Command="{Binding DataContext.OpenFolderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding Path}"
+                                AutomationProperties.Name="{Binding Path}">
+                            <Button.Tag>
+                                <MultiBinding Converter="{StaticResource PathEquals}">
+                                    <Binding Path="Path" />
+                                    <Binding Path="DataContext.ActiveFolder" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                                </MultiBinding>
+                            </Button.Tag>
+                            <Button.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Open in new tab" Click="OnPinNewTab" />
+                                    <MenuItem Header="Unpin" Click="OnUnpin" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                            <StackPanel Orientation="Horizontal">
+                                <c:Icon Data="{StaticResource Icon.Folder}" Foreground="{DynamicResource DptMuted}" />
+                                <TextBlock Margin="9,0,0,0" TextTrimming="CharacterEllipsis" MaxWidth="140" Text="{Binding Display}" />
+                            </StackPanel>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock Text="THIS PC" Style="{StaticResource SectionHeading}" />
+            <ItemsControl ItemsSource="{Binding Volumes}" AutomationProperties.AutomationId="NavDrivesList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Button Style="{StaticResource NavButton}" ToolTip="{Binding FreeText}"
+                                Command="{Binding DataContext.OpenFolderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding Root}"
+                                AutomationProperties.Name="{Binding DisplayName}">
+                            <Button.Tag>
+                                <MultiBinding Converter="{StaticResource PathEquals}">
+                                    <Binding Path="Root" />
+                                    <Binding Path="DataContext.ActiveFolder" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                                </MultiBinding>
+                            </Button.Tag>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <c:Icon x:Name="DriveIcon" Data="{StaticResource Icon.HardDrive}" Foreground="{DynamicResource DptMuted}" />
+                                <TextBlock Grid.Column="1" Margin="9,0,6,0" Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Grid.Column="2" Text="{Binding Letter}" Style="{StaticResource Small}" VerticalAlignment="Center" />
+                            </Grid>
+                        </Button>
+                        <DataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsRemovable}" Value="True">
+                                <Setter TargetName="DriveIcon" Property="Data" Value="{StaticResource Icon.Usb}" />
+                            </DataTrigger>
+                        </DataTemplate.Triggers>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Button Style="{StaticResource NavButton}" Margin="0,19,0,0" Command="{Binding GoToCommand}" CommandParameter="Settings" AutomationProperties.AutomationId="NavSettings"
+                    Tag="{Binding ActiveKind, Converter={StaticResource Equals}, ConverterParameter=Settings}">
+                <StackPanel Orientation="Horizontal">
+                    <c:Icon Data="{StaticResource Icon.Settings}" />
+                    <TextBlock Text="Settings" Margin="9,0,0,0" />
+                </StackPanel>
+            </Button>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
+
