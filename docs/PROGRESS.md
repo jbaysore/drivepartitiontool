@@ -7,7 +7,7 @@ Evidence that each milestone's exit criteria in `IMPLEMENTATION_PLAN.md` are met
 | Step 0 — Repo setup | Done | `481c13a` |
 | M0 — Bootstrap | Done | see git log |
 | M1 — Explorer shell | Done | see git log |
-| M2 — Index service, search, folder sizes | Not started | |
+| M2 — Index service, search, folder sizes | Done | see git log |
 | M3 — Storage insight | Not started | |
 | M4 — Safe file-operation engine | Not started | |
 | M5 — Categories and rules | Not started | |
@@ -45,3 +45,16 @@ Evidence that each milestone's exit criteria in `IMPLEMENTATION_PLAN.md` are met
   - Screenshots checked: Home and folder views render as in the mockup.
   - UI tests only send keyboard/mouse input while the app is the foreground window (`AppSession.EnsureForeground`).
 - **Owner check pending:** "usable for a day as the only file browser" is a manual, real-use check for the owner.
+
+## M2 — Index service, search and folder sizes
+
+- `Dpt.Index`: compact in-memory `VolumeIndex` (entries + shared name buffer, child links, rolled-up size / size on disk / file count, binary snapshots that keep raw UTF-16 names). NTFS volumes: direct MFT read (`NtfsVolume.LoadInto`, fix-ups, `$STANDARD_INFORMATION`/`$FILE_NAME`/`$DATA`, extension records, Win32-over-DOS names, hard links counted once) + USN journal tailing (`ReadChanges`, `OpenFileById` stat). Other file systems / no admin: directory scan + `FileSystemWatcher`.
+- `IndexEngine` (`ICatalog`): volume discovery, per-volume workers, selection config, snapshots, change events. `SearchExecutor`: words in any order; `ext:`, `type:`, `size:`, `modified:`, `in:`, `drive:`, `folder:`/`file:` filters; hidden-tree exclusion; ranking exact > prefix > word-boundary > substring + recency + visited-location boost; largest files/folders; folder listing.
+- `Dpt.Ipc`: length-prefixed JSON named pipe, ACL = owner SID + Administrators + SYSTEM; only write = validated "selected volumes". `Dpt.IndexService`: LocalSystem Windows service (`DrivePartitionToolCatalog`), below-normal priority.
+- App: `CatalogService` (service if running, else in-app scan engine), Search page (filter chips, sort, paging, preview pane, live refresh on changes, `--search` argument), folder sizes from the catalog (walk fallback), Home largest items, Settings catalog panel (drives to search, rebuild, install/repair/remove service via one UAC prompt: `--install-service` copies to `%ProgramFiles%\DrivePartitionTool`, private ACL'd catalog folder, `sc create … delayed-auto`).
+- **Deviation:** the plan's 1M-file search target is verified on a synthetic 1M-entry index (same search path) rather than a VHD with 1M real files, which would take a long time to create; the real system drive (3.3M entries) is used for MFT load speed.
+- **Evidence:**
+  - Fast tests (`./build.ps1`): Core 58, Data 8, Shell 10, Index 25, UI 14 — all pass. Includes `One_million_entries_first_page_under_100ms` (median of 5 runs < 100 ms), scan-mode create/rename/move/delete within 2 s, pipe round trip incl. change subscription, MFT parser on synthetic records (fix-ups, torn records, run lists, extension records).
+  - Elevated (`tools/run-elevated-tests.ps1`, trx in `.local/TestResults`): `Reads_system_drive_mft_quickly_and_correctly` — C: 3,307,919 entries in 6.9 s (2.1 s per million; target < 30 s); `notepad.exe` size and `drivers\etc` total match the file system. `Journal_reflects_changes_within_two_seconds_and_hard_links_count_once` on a test VHDX — hard link counted once, then create/rename/move/size change/delete-tree all reflected (whole sequence 1.3 s).
+  - Search UI tests via UI Automation (no keyboard): nested partial-name match, live appearance of a new file, `ext:` filter; folder search box scoped to the folder.
+- **Follow-up:** C:'s logical total (1.49 TB) exceeds its capacity — expected for sparse files/cloud placeholders; the MFT test now also prints size on disk vs. volume used for the next elevated run.

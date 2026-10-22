@@ -30,6 +30,8 @@ public class ElevatedIndexTests(ITestOutputHelper output)
         sw.Stop();
         var perMillion = sw.Elapsed.TotalSeconds / Math.Max(1, index.LiveCount / 1_000_000.0);
         output.WriteLine($"{root}: {index.LiveCount:N0} entries in {sw.Elapsed.TotalSeconds:F1}s ({perMillion:F1}s per million); total {index.Size(index.RootIndex):N0} bytes");
+        var drive = new DriveInfo(root);
+        output.WriteLine($"size on disk {index.SizeOnDisk(index.RootIndex):N0} bytes; volume used {drive.TotalSize - drive.TotalFreeSpace:N0} bytes");
         Assert.True(index.LiveCount > 50_000);
         Assert.True(perMillion < 30, $"MFT load too slow: {perMillion:F1}s per million entries");
 
@@ -47,7 +49,12 @@ public class ElevatedIndexTests(ITestOutputHelper output)
     [Fact]
     public async Task Journal_reflects_changes_within_two_seconds_and_hard_links_count_once()
     {
+        var stepLog = Path.Combine(TestVhd.Folder, "journal-test.log");
+        Directory.CreateDirectory(TestVhd.Folder);
+        void Step(string s) => File.AppendAllText(stepLog, $"{DateTime.Now:HH:mm:ss.fff} {s}{Environment.NewLine}");
+        Step("creating vhd");
         using var vhd = TestVhd.Create(256);
+        Step($"vhd ready at {vhd.Root}");
         var r = vhd.Root;
         Directory.CreateDirectory(Path.Combine(r, "Media", "Video"));
         File.WriteAllBytes(Path.Combine(r, "Media", "Video", "clip.mp4"), new byte[100_000]);
@@ -56,9 +63,11 @@ public class ElevatedIndexTests(ITestOutputHelper output)
 
         var data = Path.Combine(TestVhd.Folder, "engine-" + Guid.NewGuid().ToString("N"));
         using var engine = new IndexEngine(new EngineOptions { DataDirectory = data, UseMft = true, FixedRoots = [r], PollInterval = TimeSpan.FromMilliseconds(250) });
+        Step("engine starting");
         engine.Start();
         await engine.WaitUntilReadyAsync(TimeSpan.FromSeconds(60));
         var status = engine.GetStatus().Volumes.Single();
+        Step($"engine ready: {status.State} {status.Mode} {status.Items} {status.Message}");
         Assert.Equal("MFT", status.Mode);
 
         // Hard link: the 1 MB file is counted once in the volume total.
@@ -74,6 +83,7 @@ public class ElevatedIndexTests(ITestOutputHelper output)
                 await Task.Delay(50);
             }
 
+            Step($"{what}: done={await check()} after {sw.ElapsedMilliseconds} ms");
             Assert.True(await check(), $"{what} not reflected within 2 s");
             output.WriteLine($"{what}: {sw.ElapsedMilliseconds} ms");
         }
@@ -90,9 +100,13 @@ public class ElevatedIndexTests(ITestOutputHelper output)
         await Within2s(async () => (await engine.GetFolderSizesAsync([Path.Combine(r, "Media")]))[0] == 1_105_000, "move");
 
         File.WriteAllBytes(Path.Combine(r, "Media", "Video", "clip.mp4"), new byte[300_000]);
-        await Within2s(async () => (await engine.GetFolderSizesAsync([Path.Combine(r, "Media", "Video")]))[0] == 1_300_000, "size change");
+        // Grew by 200 KB. (The hard-linked 1 MB file is counted once, under whichever folder holds its primary name.)
+        await Within2s(async () => (await engine.GetFolderSizesAsync([Path.Combine(r, "Media")]))[0] == 1_305_000, "size change");
 
         Directory.Delete(Path.Combine(r, "Media"), true);
-        await Within2s(async () => await Count("clip") == 0 && (await engine.GetFolderSizesAsync([r]))[0] == 0, "delete tree");
+        // (The volume root also holds Windows' own "System Volume Information", so check the deleted tree is gone.)
+        await Within2s(async () => await Count("clip") == 0 && await Count("invoice-final") == 0 &&
+                                   (await engine.GetFolderSizesAsync([Path.Combine(r, "Media")]))[0] is null, "delete tree");
+        Step("disposing");
     }
 }

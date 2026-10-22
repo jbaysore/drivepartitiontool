@@ -452,7 +452,7 @@ internal sealed class VolumeWorker : IDisposable
         }
 
         var stats = last.Values.Where(c => (c.Reason & NtfsVolume.UsnReasonFileDelete) == 0)
-            .ToDictionary(c => c.FileRef, c => ntfs.Stat(c.FileRef));
+            .ToDictionary(c => c.FileRef, c => ntfs.Stat(c.FullFileRef));
 
         index.Lock.EnterWriteLock();
         try

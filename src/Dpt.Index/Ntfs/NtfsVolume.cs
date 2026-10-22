@@ -6,7 +6,8 @@ using Microsoft.Win32.SafeHandles;
 
 namespace Dpt.Index.Ntfs;
 
-public sealed record UsnChange(ulong FileRef, ulong ParentRef, string Name, uint Reason, uint Attributes);
+/// <summary>One journal record. <see cref="FileRef"/>/<see cref="ParentRef"/> are MFT record numbers; <see cref="FullFileRef"/> includes the sequence number (needed to open the file by ID).</summary>
+public sealed record UsnChange(ulong FileRef, ulong ParentRef, string Name, uint Reason, uint Attributes, ulong FullFileRef);
 
 /// <summary>
 /// Reads an NTFS volume's Master File Table directly (names, parents, sizes, times in one sequential pass) and tails its
@@ -207,14 +208,15 @@ public sealed unsafe class NtfsVolume : IDisposable
                 var major = BinaryPrimitives.ReadUInt16LittleEndian(span[4..]);
                 if (major == 2)
                 {
-                    var frn = MftRecordParser.RecordNumber(BinaryPrimitives.ReadUInt64LittleEndian(span[8..]));
+                    var fullFrn = BinaryPrimitives.ReadUInt64LittleEndian(span[8..]);
+                    var frn = MftRecordParser.RecordNumber(fullFrn);
                     var parent = MftRecordParser.RecordNumber(BinaryPrimitives.ReadUInt64LittleEndian(span[16..]));
                     var reason = BinaryPrimitives.ReadUInt32LittleEndian(span[40..]);
                     var attributes = BinaryPrimitives.ReadUInt32LittleEndian(span[52..]);
                     var nameLength = BinaryPrimitives.ReadUInt16LittleEndian(span[56..]);
                     var nameOffset = BinaryPrimitives.ReadUInt16LittleEndian(span[58..]);
                     var name = new string(MemoryMarshal.Cast<byte, char>(span.Slice(nameOffset, nameLength)));
-                    into.Add(new UsnChange(frn, parent, name, reason, attributes));
+                    into.Add(new UsnChange(frn, parent, name, reason, attributes, fullFrn));
                 }
 
                 offset += length;
@@ -226,10 +228,10 @@ public sealed unsafe class NtfsVolume : IDisposable
         }
     }
 
-    /// <summary>Current size/time/attributes of a file by its MFT record number, or null if it no longer exists.</summary>
-    public (bool IsDirectory, uint Attributes, long Size, long Allocated, long ModifiedUtcTicks)? Stat(ulong record)
+    /// <summary>Current size/time/attributes of a file by its full file reference (record + sequence), or null if it no longer exists.</summary>
+    public (bool IsDirectory, uint Attributes, long Size, long Allocated, long ModifiedUtcTicks)? Stat(ulong fullFileRef)
     {
-        var id = new Win32.FILE_ID_DESCRIPTOR { dwSize = (uint)sizeof(Win32.FILE_ID_DESCRIPTOR), Type = 0, FileId = (long)record };
+        var id = new Win32.FILE_ID_DESCRIPTOR { dwSize = (uint)sizeof(Win32.FILE_ID_DESCRIPTOR), Type = 0, FileId = (long)fullFileRef };
         using var h = Win32.OpenFileById(_rootHandle, ref id, Win32.FILE_READ_ATTRIBUTES,
             Win32.FILE_SHARE_READ | Win32.FILE_SHARE_WRITE | Win32.FILE_SHARE_DELETE, IntPtr.Zero, Win32.FILE_FLAG_BACKUP_SEMANTICS);
         if (h.IsInvalid) return null;

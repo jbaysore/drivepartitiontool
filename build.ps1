@@ -15,8 +15,12 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
+# Don't leave MSBuild/compiler server processes behind: they inherit console/pipe handles and keep callers waiting.
+$env:MSBUILDDISABLENODEREUSE = '1'
+$env:DOTNET_CLI_USE_MSBUILD_SERVER = '0'
+$env:UseSharedCompilation = 'false'
 
-dotnet build DrivePartitionTool.sln -c $Configuration -v q --nologo
+dotnet build DrivePartitionTool.sln -c $Configuration -v q --nologo --disable-build-servers
 if ($LASTEXITCODE -ne 0) { throw "Build failed." }
 
 if ($Elevated) {
@@ -32,6 +36,7 @@ if ($Elevated) {
     if ($NoUi) { $filter += '&Category!=UI' }
 }
 
-dotnet test DrivePartitionTool.sln -c $Configuration --no-build --nologo --filter $filter --logger "console;verbosity=normal"
+$blame = if ($Elevated) { @('--blame-hang', '--blame-hang-timeout', '5m', '--results-directory', '.local\TestResults', '--logger', 'trx') } else { @() }
+dotnet test DrivePartitionTool.sln -c $Configuration --no-build --nologo --filter $filter --logger "console;verbosity=normal" @blame
 if ($LASTEXITCODE -ne 0) { throw "Tests failed." }
 Write-Host "All tests passed ($filter)." -ForegroundColor Green
