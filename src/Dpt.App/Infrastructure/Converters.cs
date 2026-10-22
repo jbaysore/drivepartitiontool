@@ -95,3 +95,12 @@ public sealed class InverseBoolConverter : IValueConverter
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => value is not true;
 }
+
+/// <summary>Resource key (e.g. "DptAccent") → brush from the current palette.</summary>
+public sealed class BrushKeyConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object parameter, CultureInfo culture) =>
+        value is string key ? Application.Current.TryFindResource(key) : null;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
+}

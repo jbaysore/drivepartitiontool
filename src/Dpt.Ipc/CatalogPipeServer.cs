@@ -120,6 +120,8 @@ public sealed class CatalogPipeServer(ICatalog catalog, IReadOnlyList<SecurityId
                     throw new InvalidDataException("Invalid volume list.");
                 await catalog.SetSelectedVolumesAsync(roots, ct);
                 return null;
+            case CatalogMethods.DiskHealth:
+                return E(await catalog.GetDiskHealthAsync(P<List<int>>().Take(64).ToList(), ct));
             default:
                 throw new InvalidDataException($"Unknown method '{r.Method}'.");
         }

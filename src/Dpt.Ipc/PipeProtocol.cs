@@ -65,4 +65,5 @@ public static class CatalogMethods
     public const string ListFolder = "listFolder";
     public const string SetSelectedVolumes = "setSelectedVolumes";
     public const string Subscribe = "subscribe";
+    public const string DiskHealth = "diskHealth";
 }

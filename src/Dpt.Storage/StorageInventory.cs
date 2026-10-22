@@ -18,6 +18,9 @@ public static class StorageInventory
     /// <summary>Gaps smaller than this (alignment, GPT backup header) are not shown as unallocated space.</summary>
     private const long MinimumGap = 16L * 1024 * 1024;
 
+    /// <summary>Optional lookup for a volume's Recycle Bin size limit (supplied by the app).</summary>
+    public static Func<string, long?>? RecycleBinLimit { get; set; }
+
     public static IReadOnlyList<DiskInfo> GetDisks(bool includeHealth = false)
     {
         using var session = CimSession.Create(null);
@@ -103,7 +106,7 @@ public static class StorageInventory
 
     private static long? SafeRecycleLimit(string root)
     {
-        try { return Shell.Operations.RecycleBin.MaxCapacityBytes(root); }
+        try { return RecycleBinLimit?.Invoke(root); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { return null; }
     }
 

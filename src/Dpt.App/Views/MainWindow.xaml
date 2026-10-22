@@ -27,6 +27,12 @@
         <DataTemplate DataType="{x:Type vm:SearchPageViewModel}">
             <v:SearchView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:DrivesPageViewModel}">
+            <v:DrivesView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:LargestPageViewModel}">
+            <v:LargestView />
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:PlaceholderPageViewModel}">
             <v:PlaceholderView />
         </DataTemplate>

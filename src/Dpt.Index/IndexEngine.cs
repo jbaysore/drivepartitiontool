@@ -226,6 +226,13 @@ public sealed class IndexEngine : ICatalog, IDisposable
         return Task.CompletedTask;
     }
 
+    public Task<IReadOnlyList<DiskHealthInfo>> GetDiskHealthAsync(IReadOnlyList<int> diskNumbers, CancellationToken ct = default) => Task.Run(() =>
+    {
+        var health = Storage.StorageInventory.TryHealthAll(diskNumbers);
+        IReadOnlyList<DiskHealthInfo> list = diskNumbers.Zip(health, (n, h) => new DiskHealthInfo(n, h.Available, h.TemperatureC, h.WearPercent, h.PowerOnHours, h.Note)).ToList();
+        return list;
+    }, ct);
+
     /// <summary>Discards a volume's catalog and rebuilds it from scratch.</summary>
     public void Rebuild(string root)
     {

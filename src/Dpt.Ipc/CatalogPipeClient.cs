@@ -55,6 +55,9 @@ public sealed class CatalogPipeClient(string pipeName = PipeProtocol.CatalogPipe
     public Task SetSelectedVolumesAsync(IReadOnlyList<string> roots, CancellationToken ct = default) =>
         Call<object>(CatalogMethods.SetSelectedVolumes, roots, ct);
 
+    public async Task<IReadOnlyList<DiskHealthInfo>> GetDiskHealthAsync(IReadOnlyList<int> diskNumbers, CancellationToken ct = default) =>
+        await Call<List<DiskHealthInfo>>(CatalogMethods.DiskHealth, diskNumbers, ct);
+
     public event EventHandler<IReadOnlyList<CatalogChange>>? Changed
     {
         add

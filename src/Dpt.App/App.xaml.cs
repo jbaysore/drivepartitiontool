@@ -35,6 +35,7 @@ public partial class App : Application
         services.Theme.Initialize(services.Settings.Theme);
         services.FileOps.Dialogs = new WpfDialogService();
         services.Drives.Refresh();
+        Dpt.Storage.StorageInventory.RecycleBinLimit = Dpt.Shell.Operations.RecycleBin.MaxCapacityBytes;
         _ = services.Catalog.InitializeAsync();
         SettingsView.ExtraContent = () => new CatalogPanel { DataContext = new CatalogPanelViewModel() };
         Starting?.Invoke(services);
@@ -83,6 +84,13 @@ public static class CommandLine
         for (var k = 0; k < args.Length; k++)
         {
             var a = args[k];
+            if (a == "--open" && k + 1 < args.Length)
+            {
+                if (Enum.TryParse<LocationKind>(args[++k], ignoreCase: true, out var kind))
+                    list.Add(kind == LocationKind.Home ? Location.Home : Location.Page(kind));
+                continue;
+            }
+
             if (a == "--search" && k + 1 < args.Length)
             {
                 list.Add(Location.Search(args[++k], null));

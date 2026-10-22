@@ -38,8 +38,18 @@ public sealed class AppSession : IDisposable
         psi.Environment["DPT_CATALOG_ROOTS"] = Browse;
         App = Application.Launch(psi);
         Automation = new UIA3Automation();
-        Window = Retry.WhileNull(() => App.GetMainWindow(Automation, TimeSpan.FromSeconds(1)), Timeout, throwOnTimeout: true).Result!;
-        WaitFor(() => Find("FileList") ?? Find("HomeView") ?? Find("SearchView"));
+        try
+        {
+            Window = Retry.WhileNull(() => App.GetMainWindow(Automation, TimeSpan.FromSeconds(1)), TimeSpan.FromSeconds(30), throwOnTimeout: true).Result!;
+            WaitFor(() => Find("TabStrip"), TimeSpan.FromSeconds(30));
+        }
+        catch
+        {
+            // Never leave a test copy of the app running (it would also hold the test runner's output pipe open).
+            try { App.Kill(); } catch (Exception) { }
+            Automation.Dispose();
+            throw;
+        }
     }
 
     public string Root { get; }

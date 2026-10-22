@@ -2,7 +2,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Dpt.Core\Dpt.Core.csproj" />
-    <ProjectReference Include="..\Dpt.Shell\Dpt.Shell.csproj" />
   </ItemGroup>
 
   <ItemGroup>

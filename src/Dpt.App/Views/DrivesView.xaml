@@ -1,0 +1,111 @@
+<UserControl x:Class="Dpt.App.Views.DrivesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:Dpt.App.Controls"
+             AutomationProperties.AutomationId="DrivesView">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="26,24,26,27" MaxWidth="1100" HorizontalAlignment="Stretch">
+            <DockPanel Margin="0,0,0,18">
+                <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Disk tools…" Command="{Binding OpenDiskToolsCommand}" VerticalAlignment="Top" />
+                <StackPanel>
+                    <TextBlock Text="Drives" Style="{StaticResource PageTitle}" />
+                    <TextBlock Text="Each physical drive, how it's divided into partitions, and how full each part is." Style="{StaticResource Muted}" />
+                </StackPanel>
+            </DockPanel>
+
+            <TextBlock Text="{Binding Error}" Foreground="{DynamicResource DptRed}" TextWrapping="Wrap" Visibility="{Binding Error, Converter={StaticResource NullToCollapsed}}" />
+            <TextBlock Text="Reading drive information…" Style="{StaticResource Muted}" Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisible}}" />
+
+            <ItemsControl ItemsSource="{Binding Disks}" AutomationProperties.AutomationId="DiskList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,16" AutomationProperties.Name="{Binding Title}">
+                            <StackPanel>
+                                <DockPanel>
+                                    <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding Badges}" VerticalAlignment="Top">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="{DynamicResource DptAccentSoft}" CornerRadius="5" Padding="7,2" Margin="6,0,0,4">
+                                                    <TextBlock Text="{Binding}" FontSize="11" Foreground="{DynamicResource DptAccent}" />
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <StackPanel Orientation="Horizontal">
+                                        <c:Icon Data="{StaticResource Icon.HardDrive}" Size="20" Margin="0,0,10,0" />
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}" Style="{StaticResource H2}" AutomationProperties.AutomationId="DiskTitle" />
+                                            <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Small}" AutomationProperties.AutomationId="DiskSubtitle" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <!-- Partition bar -->
+                                <Border Margin="0,14,0,4" Height="30" CornerRadius="6" ClipToBounds="True" Background="{DynamicResource DptPanelSoft}">
+                                    <ItemsControl ItemsSource="{Binding Segments}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <c:ProportionalPanel MinItemWidth="6" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemContainerStyle>
+                                            <Style TargetType="ContentPresenter">
+                                                <Setter Property="c:ProportionalPanel.Weight" Value="{Binding Weight}" />
+                                            </Style>
+                                        </ItemsControl.ItemContainerStyle>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="{Binding BrushKey, Converter={StaticResource BrushKey}}" BorderBrush="{DynamicResource DptWindow}" BorderThickness="0,0,2,0"
+                                                        ToolTip="{Binding Detail}" Opacity="0.85">
+                                                    <TextBlock Text="{Binding Label}" Foreground="White" FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center" Margin="6,0" />
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Border>
+                                <TextBlock Text="{Binding HealthText}" Style="{StaticResource Small}" Margin="0,2,0,10" AutomationProperties.AutomationId="DiskHealth" />
+
+                                <!-- Partitions -->
+                                <ItemsControl ItemsSource="{Binding Partitions}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border BorderBrush="{DynamicResource DptBorder}" BorderThickness="0,1,0,0" Padding="0,9" AutomationProperties.Name="{Binding Name}">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="2*" />
+                                                        <ColumnDefinition Width="2*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Name}" FontWeight="Medium" />
+                                                        <TextBlock Style="{StaticResource Small}">
+                                                            <Run Text="{Binding SizeText, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding FileSystem, Mode=OneWay}" />
+                                                        </TextBlock>
+                                                        <TextBlock Text="{Binding Tags}" FontSize="11" Foreground="{DynamicResource DptAccent}" Visibility="{Binding HasTags, Converter={StaticResource BoolToVisible}}" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Margin="12,0" Visibility="{Binding HasUsage, Converter={StaticResource BoolToVisible}}">
+                                                        <ProgressBar Style="{StaticResource Meter}" Value="{Binding UsedFraction, Mode=OneWay}" Foreground="{Binding UsedFraction, Converter={StaticResource UsageBrush}}" Margin="0,4,0,4" />
+                                                        <TextBlock Text="{Binding UsageText}" Style="{StaticResource Small}" />
+                                                        <TextBlock Text="{Binding RecycleText}" Style="{StaticResource Small}" />
+                                                    </StackPanel>
+                                                    <Button Grid.Column="2" Style="{StaticResource LinkButton}" Content="Open" VerticalAlignment="Center"
+                                                            Visibility="{Binding CanOpen, Converter={StaticResource BoolToVisible}}"
+                                                            Command="{Binding DataContext.OpenVolumeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding Root}" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

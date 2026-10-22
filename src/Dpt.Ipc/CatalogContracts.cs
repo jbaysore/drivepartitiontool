@@ -136,6 +136,9 @@ public enum ChangeKind
     Modified,
 }
 
+/// <summary>Drive health counters (temperature, wear). Windows only reveals them to administrators/SYSTEM, so the service answers.</summary>
+public sealed record DiskHealthInfo(int DiskNumber, bool Available, int? TemperatureC, int? WearPercent, long? PowerOnHours, string? Note);
+
 public sealed record CatalogChange(ChangeKind Kind, string Path, string? OldPath, bool IsFolder);
 
 /// <summary>
@@ -153,6 +156,8 @@ public interface ICatalog
     Task<IReadOnlyList<CatalogItem>> ListFolderAsync(string path, CancellationToken ct = default);
 
     Task SetSelectedVolumesAsync(IReadOnlyList<string> roots, CancellationToken ct = default);
+
+    Task<IReadOnlyList<DiskHealthInfo>> GetDiskHealthAsync(IReadOnlyList<int> diskNumbers, CancellationToken ct = default);
 
     /// <summary>Raised for file changes on selected volumes (used by automatic rules).</summary>
     event EventHandler<IReadOnlyList<CatalogChange>>? Changed;

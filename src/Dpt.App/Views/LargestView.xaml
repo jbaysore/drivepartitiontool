@@ -1,0 +1,114 @@
+<UserControl x:Class="Dpt.App.Views.LargestView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:Dpt.App.Controls"
+             AutomationProperties.AutomationId="LargestView">
+    <UserControl.Resources>
+        <Style x:Key="SizeRow" TargetType="ListViewItem" BasedOn="{StaticResource GridRowStyle}">
+            <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+            <EventSetter Event="MouseDoubleClick" Handler="OnRowDoubleClick" />
+        </Style>
+        <Style x:Key="Toggle" TargetType="RadioButton" BasedOn="{StaticResource {x:Type RadioButton}}">
+            <Setter Property="Margin" Value="0,0,16,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="22,18,22,10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <DockPanel>
+            <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="Search all drives" Command="{Binding ClearScopeCommand}" VerticalAlignment="Center"
+                    Visibility="{Binding UnderPath, Converter={StaticResource NullToCollapsed}}" />
+            <StackPanel>
+                <TextBlock Text="{Binding Title}" Style="{StaticResource PageTitle}" />
+                <TextBlock Text="Find what uses the most space. Double-click a folder to see what's inside it." Style="{StaticResource Muted}" />
+            </StackPanel>
+        </DockPanel>
+
+        <WrapPanel Grid.Row="1" Margin="0,14,0,0" Visibility="{Binding IsDrilling, Converter={StaticResource BoolToCollapsed}}">
+            <RadioButton Style="{StaticResource Toggle}" Content="Files" IsChecked="{Binding ShowFiles, Mode=OneWay}" Checked="OnFilesChecked" AutomationProperties.AutomationId="ShowFiles" />
+            <RadioButton Style="{StaticResource Toggle}" Content="Folders" IsChecked="{Binding ShowFolders}" AutomationProperties.AutomationId="ShowFolders" />
+            <ComboBox ItemsSource="{Binding DriveOptions}" SelectedItem="{Binding Drive}" DisplayMemberPath="Label" MinWidth="160" Margin="0,0,8,0" AutomationProperties.AutomationId="DriveFilter" />
+            <ComboBox ItemsSource="{Binding TypeOptions}" SelectedItem="{Binding Type}" DisplayMemberPath="Label" MinWidth="140" Margin="0,0,8,0"
+                      Visibility="{Binding ShowFiles, Converter={StaticResource BoolToVisible}}" AutomationProperties.AutomationId="LargestTypeFilter" />
+            <ComboBox ItemsSource="{Binding AgeOptions}" SelectedItem="{Binding Age}" DisplayMemberPath="Label" MinWidth="170" Margin="0,0,12,0" AutomationProperties.AutomationId="AgeFilter" />
+            <CheckBox Content="Show the specific folders (hide parents that are mostly one subfolder)" IsChecked="{Binding HideParentFolders}" VerticalAlignment="Center" Margin="0,0,12,0"
+                      Visibility="{Binding ShowFolders, Converter={StaticResource BoolToVisible}}" />
+            <CheckBox Content="Include hidden and system items" IsChecked="{Binding IncludeHidden}" VerticalAlignment="Center" />
+        </WrapPanel>
+
+        <DockPanel Grid.Row="1" Margin="0,14,0,0" Visibility="{Binding IsDrilling, Converter={StaticResource BoolToVisible}}">
+            <Button Style="{StaticResource CommandButton}" Command="{Binding DrillUpCommand}" AutomationProperties.AutomationId="DrillUp">
+                <StackPanel Orientation="Horizontal">
+                    <c:Icon Data="{StaticResource Icon.ArrowLeft}" Size="15" />
+                    <TextBlock Text="Back" Margin="6,0,0,0" />
+                </StackPanel>
+            </Button>
+            <TextBlock Text="{Binding DrillTitle}" VerticalAlignment="Center" Margin="10,0,0,0" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" AutomationProperties.AutomationId="DrillTitle" />
+        </DockPanel>
+
+        <Border Grid.Row="2" Style="{StaticResource InfoPanel}" Margin="0,10,0,0" Visibility="{Binding Note, Converter={StaticResource NullToCollapsed}}">
+            <TextBlock Text="{Binding Note}" Style="{StaticResource Muted}" TextWrapping="Wrap" />
+        </Border>
+
+        <ListView x:Name="List" Grid.Row="3" Margin="0,10,0,0" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" SelectionMode="Extended"
+                  ItemContainerStyle="{StaticResource SizeRow}" BorderThickness="0" Background="Transparent"
+                  VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                  PreviewKeyDown="OnKeyDown" MouseRightButtonUp="OnRightClick" AutomationProperties.AutomationId="LargestList">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="Name" Width="280">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <c:Icon Data="{Binding IconKey, Converter={StaticResource IconKey}}" Size="15" Foreground="{DynamicResource DptMuted}" />
+                                    <TextBlock Text="{Binding Name}" Margin="8,0,0,0" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+                    <GridViewColumn Header="Size" Width="220">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <Grid Width="200">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="70" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding SizeText}" TextAlignment="Right" Margin="0,0,8,0" />
+                                    <ProgressBar Grid.Column="1" Style="{StaticResource Meter}" Value="{Binding Fraction, Mode=OneWay}" VerticalAlignment="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+                    <GridViewColumn Header="On disk" Width="90" DisplayMemberBinding="{Binding OnDiskText}" />
+                    <GridViewColumn Header="Contents" Width="100" DisplayMemberBinding="{Binding FilesText}" />
+                    <GridViewColumn Header="Modified" Width="100" DisplayMemberBinding="{Binding ModifiedText}" />
+                    <GridViewColumn Header="Location" Width="340">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Location}" Foreground="{DynamicResource DptMuted}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Location}" />
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+                </GridView>
+            </ListView.View>
+        </ListView>
+
+        <DockPanel Grid.Row="4" Margin="0,8,0,0">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button Style="{StaticResource CommandButton}" Content="Open location" Command="{Binding OpenLocationCommand}" />
+                <Button Style="{StaticResource CommandButton}" Content="Move to…" Click="OnMoveTo" />
+                <Button Style="{StaticResource DangerCommandButton}" Content="Recycle" Click="OnRecycle" AutomationProperties.AutomationId="LargestRecycle" />
+            </StackPanel>
+            <TextBlock Text="{Binding StatusText}" Style="{StaticResource Small}" VerticalAlignment="Center" AutomationProperties.AutomationId="LargestStatus" />
+        </DockPanel>
+    </Grid>
+</UserControl>

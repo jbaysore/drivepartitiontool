@@ -17,6 +17,8 @@ public static class PageFactory
         [LocationKind.Folder] = (t, l) => new FolderPageViewModel(t, l),
         [LocationKind.Settings] = (t, _) => new SettingsPageViewModel(t),
         [LocationKind.Search] = (t, l) => new SearchPageViewModel(t, l),
+        [LocationKind.Drives] = (t, _) => new DrivesPageViewModel(t),
+        [LocationKind.LargestItems] = (t, l) => new LargestPageViewModel(t, l),
     };
 
     public static void Register(LocationKind kind, Func<TabViewModel, Location, PageViewModel> factory) => Factories[kind] = factory;
