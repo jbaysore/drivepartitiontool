@@ -1,8 +1,18 @@
 ﻿# DrivePartitionTool — Scoping Notes
 
 **Started:** 2026-10-22  
-**Status:** UI discussion in progress  
+**Status:** Scoped; implementation in progress (see `IMPLEMENTATION_PLAN.md`, `PROGRESS.md`)  
 **Question limit:** 50 total
+
+## Planning decisions (2026-10-22)
+
+- V1 includes everything, including disk tools (clone, Windows migration, partitions); built in milestone order M0–M10.
+- Search catalog is kept current by a small background Windows service (installed once with admin approval); the main app never runs elevated.
+- Default start view is Home-first; a setting switches to Folder-first or "reopen last tabs".
+- Disk tools are tested on virtual disks (VHD/VHDX) only, with VirtualBox for boot tests; real drives are never touched by tests.
+- "Isolate Windows" means a bootable Windows-only copy to *another* drive (system + chosen apps/folders); the source is never modified. In-place cleanup is out of V1.
+- Out of V1: MBR↔GPT conversion, moving partitions, in-place non-Windows cleanup, offline WinRE-based repair.
+- Repo: private GitHub `jbaysore/drivepartitiontool`, commit and push to `main` per `AGENTS.md`.
 
 ## Project context
 

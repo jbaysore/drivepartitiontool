@@ -5,8 +5,20 @@
 
 # Project context
 
-- Windows-only personal file browser + drive tool. Scope and decisions: `PROJECT_SCOPE.md`
-  (moves to `docs/` in M0). Implementation plan: `docs/IMPLEMENTATION_PLAN.md` (added in M0).
+- Windows-only personal file browser + drive tool. Scope and decisions: `docs/PROJECT_SCOPE.md`.
+  Implementation plan (source of truth): `docs/IMPLEMENTATION_PLAN.md`. Progress and evidence per
+  milestone: `docs/PROGRESS.md`. Decisions: `docs/decisions/NNNN-*.md` (short ADRs).
+- C# / .NET 10, WPF app (`src/Dpt.App`), solution `DrivePartitionTool.sln`. `Dpt.Core` is pure
+  logic (no I/O, `net10.0`); everything else targets `net10.0-windows`.
+
+# Build and test
+
+- `./build.ps1` — build + all fast tests (everything not tagged `[Trait("Category", "Elevated")]`).
+- `./build.ps1 -NoUi` — same, skipping FlaUI tests (`Category=UI`).
+- `./build.ps1 -Elevated` — from an Administrator shell: index and disk-worker tests on test VHDs only.
+- Run the app: `dotnet run --project src/Dpt.App`.
+- Tag tests that need admin with `[Trait("Category", "Elevated")]` and UI-automation tests with
+  `[Trait("Category", "UI")]`.
 
 # Safety rules (mandatory)
 
