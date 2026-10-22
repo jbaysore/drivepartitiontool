@@ -26,6 +26,7 @@ if ($Elevated) {
     }
     $env:DPT_SAFETY = 'virtual-only'
     $filter = 'Category=Elevated'
+    if ($env:DPT_EXTRA_FILTER) { $filter += '&' + $env:DPT_EXTRA_FILTER }
 } else {
     $filter = 'Category!=Elevated'
     if ($NoUi) { $filter += '&Category!=UI' }

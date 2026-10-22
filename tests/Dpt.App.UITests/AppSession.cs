@@ -16,7 +16,7 @@ public sealed class AppSession : IDisposable
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(15);
 
-    public AppSession(string? startFolder = null, bool createSample = true)
+    public AppSession(string? startFolder = null, bool createSample = true, bool openFolder = true, string? arguments = null, Action<string>? prepare = null)
     {
         Root = Path.Combine(Path.GetTempPath(), "dpt-ui-tests", Guid.NewGuid().ToString("N"));
         DataDir = Path.Combine(Root, "data");
@@ -31,13 +31,15 @@ public sealed class AppSession : IDisposable
             File.WriteAllText(Path.Combine(Browse, "file1.txt"), "one");
         }
 
-        var psi = new ProcessStartInfo(ExePath, $"\"{Browse}\"") { UseShellExecute = false };
+        prepare?.Invoke(Browse);
+        var psi = new ProcessStartInfo(ExePath, arguments ?? (openFolder ? $"\"{Browse}\"" : "")) { UseShellExecute = false };
         psi.Environment["DPT_DATA_DIR"] = DataDir;
+        // Catalog only the test folder (never scan the owner's real drives from tests).
+        psi.Environment["DPT_CATALOG_ROOTS"] = Browse;
         App = Application.Launch(psi);
         Automation = new UIA3Automation();
         Window = Retry.WhileNull(() => App.GetMainWindow(Automation, TimeSpan.FromSeconds(1)), Timeout, throwOnTimeout: true).Result!;
-        Window.SetForeground();
-        WaitFor(() => Find("FileList"));
+        WaitFor(() => Find("FileList") ?? Find("HomeView") ?? Find("SearchView"));
     }
 
     public string Root { get; }
@@ -157,6 +159,7 @@ public sealed class AppSession : IDisposable
 
         Automation.Dispose();
         App.Dispose();
+        if (Environment.GetEnvironmentVariable("DPT_KEEP_UI") == "1") return;
         try { Directory.Delete(Root, true); }
         catch (IOException) { }
         catch (UnauthorizedAccessException) { }

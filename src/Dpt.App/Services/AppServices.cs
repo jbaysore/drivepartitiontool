@@ -27,6 +27,8 @@ public sealed class AppServices
             text => Environment.ExpandEnvironmentVariables(text) is var e && !e.Contains('%') ? e : null,
             KnownFolders.ResolveShellName);
         FileOps = new FileOperationsService(this);
+        Catalog = new CatalogService(this);
+        FolderSizes.Catalog = Catalog;
     }
 
     public static AppServices Current => _current ?? throw new InvalidOperationException("Services not initialized.");
@@ -40,6 +42,7 @@ public sealed class AppServices
     public JournalRepository Journal { get; }
     public FileOperationEngine Engine { get; }
     public FileOperationsService FileOps { get; }
+    public CatalogService Catalog { get; }
     public ActivityHub Activity { get; }
     public FolderSizeService FolderSizes { get; }
     public DriveService Drives { get; }

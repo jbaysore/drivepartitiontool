@@ -4,16 +4,16 @@ using Dpt.Shell.FileSystem;
 
 namespace Dpt.App.Services;
 
-/// <summary>Instant folder sizes from the search catalog (index service).</summary>
+/// <summary>Folder sizes from the search catalog (instant).</summary>
 public interface IFolderSizeSource
 {
-    /// <summary>True when the catalog covers this folder; size includes everything nested inside it.</summary>
-    bool TryGetFolderSize(string path, out long size);
+    /// <summary>Sizes including everything nested; null where the catalog doesn't (yet) know the folder.</summary>
+    Task<IReadOnlyList<long?>> GetFolderSizesAsync(IReadOnlyList<string> paths, CancellationToken ct);
 }
 
 /// <summary>
-/// Folder sizes for the size column. Uses the catalog when available, otherwise walks the folder in the background
-/// (at most two at a time) and caches the result.
+/// Folder sizes for the size column: asks the catalog first; folders it can't answer are walked in the background
+/// (at most two at a time) and cached.
 /// </summary>
 public sealed class FolderSizeService
 {
@@ -23,13 +23,21 @@ public sealed class FolderSizeService
 
     public IFolderSizeSource? Catalog { get; set; }
 
-    public long? TryGetImmediate(string path)
+    public long? TryGetImmediate(string path) =>
+        _cache.TryGetValue(path, out var c) && DateTime.UtcNow - c.At < CacheLifetime ? c.Size : null;
+
+    /// <summary>Catalog lookup for many folders at once. Results are cached briefly.</summary>
+    public async Task<IReadOnlyList<long?>> FromCatalogAsync(IReadOnlyList<string> paths, CancellationToken ct)
     {
-        if (Catalog is not null && Catalog.TryGetFolderSize(path, out var s)) return s;
-        return _cache.TryGetValue(path, out var c) && DateTime.UtcNow - c.At < CacheLifetime ? c.Size : null;
+        if (Catalog is null || paths.Count == 0) return paths.Select(_ => (long?)null).ToList();
+        var sizes = await Catalog.GetFolderSizesAsync(paths, ct).ConfigureAwait(false);
+        for (var i = 0; i < paths.Count && i < sizes.Count; i++)
+            if (sizes[i] is { } s) _cache[paths[i]] = (s, DateTime.UtcNow);
+        return sizes;
     }
 
-    public async Task<long?> GetAsync(string path, CancellationToken ct)
+    /// <summary>Walks a folder to total its size (used when the catalog doesn't cover it).</summary>
+    public async Task<long?> WalkAsync(string path, CancellationToken ct)
     {
         if (TryGetImmediate(path) is { } known) return known;
         await _walkers.WaitAsync(ct).ConfigureAwait(false);

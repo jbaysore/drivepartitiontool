@@ -24,6 +24,9 @@
         <DataTemplate DataType="{x:Type vm:SettingsPageViewModel}">
             <v:SettingsView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:SearchPageViewModel}">
+            <v:SearchView />
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:PlaceholderPageViewModel}">
             <v:PlaceholderView />
         </DataTemplate>

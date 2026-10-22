@@ -19,7 +19,7 @@ Evidence that each milestone's exit criteria in `IMPLEMENTATION_PLAN.md` are met
 
 ## Step 0 — Repo setup
 
-- `git init -b main`; `AGENTS.md` (owner's standard rules + safety rules), `CLAUDE.md` â†’ `@AGENTS.md`.
+- `git init -b main`; `AGENTS.md` (owner's standard rules + safety rules), `CLAUDE.md` → `@AGENTS.md`.
 - Private repo https://github.com/jbaysore/drivepartitiontool created and pushed.
 
 ## M0 — Bootstrap
@@ -27,7 +27,7 @@ Evidence that each milestone's exit criteria in `IMPLEMENTATION_PLAN.md` are met
 - Solution `DrivePartitionTool.sln` with all 9 `src/` and 6 `tests/` projects from the plan; `Directory.Build.props`, `.editorconfig`.
 - `build.ps1` (fast tests by default, `-Elevated`, `-NoUi`).
 - Scope doc and mockups moved to `docs/`; plan copied to `docs/IMPLEMENTATION_PLAN.md`; planning decisions recorded in `docs/PROJECT_SCOPE.md` and ADRs 0001–0004.
-- **Evidence:** `./build.ps1` â†’ "Build succeeded. 0 Warning(s) 0 Error(s)"; test run completed (no tests yet).
+- **Evidence:** `./build.ps1` → "Build succeeded. 0 Warning(s) 0 Error(s)"; test run completed (no tests yet).
 
 ## M1 — Explorer shell
 

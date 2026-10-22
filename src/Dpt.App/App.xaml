@@ -20,6 +20,7 @@
             <i:FractionToGridLengthConverter x:Key="FractionStar" />
             <i:FractionToGridLengthConverter x:Key="RemainderStar" Remainder="True" />
             <i:UsageBrushConverter x:Key="UsageBrush" />
+            <i:InverseBoolConverter x:Key="InverseBool" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

@@ -1,0 +1,48 @@
+<UserControl x:Class="Dpt.App.Views.CatalogPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.AutomationId="CatalogPanel">
+    <StackPanel>
+        <TextBlock Text="Search catalog" Style="{StaticResource H2}" Margin="0,0,0,8" />
+        <Border Style="{StaticResource Card}">
+            <StackPanel>
+                <TextBlock Text="{Binding ModeText}" Margin="0,0,0,10" />
+                <TextBlock Text="Drives to search" FontWeight="SemiBold" Margin="0,0,0,4" />
+                <ItemsControl ItemsSource="{Binding Volumes}" AutomationProperties.AutomationId="CatalogVolumes">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <CheckBox IsChecked="{Binding Selected}" VerticalAlignment="Center" AutomationProperties.Name="{Binding Label}" />
+                                <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                    <TextBlock Text="{Binding Label}" />
+                                    <TextBlock Text="{Binding StateText}" Style="{StaticResource Small}" />
+                                </StackPanel>
+                                <Button Grid.Column="2" Style="{StaticResource LinkButton}" Content="Rebuild" VerticalAlignment="Center"
+                                        Command="{Binding DataContext.RebuildCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding Root}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Rectangle Height="1" Fill="{DynamicResource DptBorder}" Margin="0,12" />
+                <TextBlock Text="{Binding ServiceText}" TextWrapping="Wrap" Margin="0,0,0,10" />
+                <StackPanel Orientation="Horizontal">
+                    <Button Style="{StaticResource PrimaryButton}" Content="Install search service…" Command="{Binding InstallServiceCommand}"
+                            Visibility="{Binding ServiceInstalled, Converter={StaticResource BoolToCollapsed}}" IsEnabled="{Binding Busy, Converter={StaticResource InverseBool}}"
+                            AutomationProperties.AutomationId="InstallService" />
+                    <Button Style="{StaticResource SecondaryButton}" Content="Repair / update service…" Command="{Binding InstallServiceCommand}" Margin="0,0,8,0"
+                            Visibility="{Binding ServiceInstalled, Converter={StaticResource BoolToVisible}}" />
+                    <Button Style="{StaticResource SecondaryButton}" Content="Remove service…" Command="{Binding UninstallServiceCommand}"
+                            Visibility="{Binding ServiceInstalled, Converter={StaticResource BoolToVisible}}" />
+                </StackPanel>
+                <TextBlock Text="{Binding Message}" Style="{StaticResource Small}" Margin="0,8,0,0" TextWrapping="Wrap"
+                           Visibility="{Binding Message, Converter={StaticResource NullToCollapsed}}" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

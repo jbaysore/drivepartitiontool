@@ -19,10 +19,20 @@
     <ProjectReference Include="..\Dpt.Shell\Dpt.Shell.csproj" />
     <ProjectReference Include="..\Dpt.Storage\Dpt.Storage.csproj" />
     <ProjectReference Include="..\Dpt.Index\Dpt.Index.csproj" />
+    <!-- Built alongside the app and copied to .\service so the installer can register it. -->
+    <ProjectReference Include="..\Dpt.IndexService\Dpt.IndexService.csproj" ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
+
+  <Target Name="CopyCatalogService" AfterTargets="Build">
+    <ItemGroup>
+      <CatalogServiceFiles Include="$(MSBuildThisFileDirectory)..\Dpt.IndexService\bin\$(Configuration)\net10.0-windows\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(CatalogServiceFiles)" DestinationFiles="@(CatalogServiceFiles->'$(OutDir)service\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.13" />
     <PackageReference Include="VirtualizingWrapPanel" Version="2.5.4" />
   </ItemGroup>
 

@@ -22,33 +22,7 @@
             </Grid>
         </DataTemplate>
 
-        <Style x:Key="RowStyle" TargetType="ListViewItem">
-            <Setter Property="MinHeight" Value="34" />
-            <Setter Property="Margin" Value="0" />
-            <Setter Property="Foreground" Value="{DynamicResource DptInk}" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ListViewItem">
-                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="5" BorderThickness="1" BorderBrush="Transparent">
-                            <GridViewRowPresenter Columns="{TemplateBinding GridView.ColumnCollection}" Content="{TemplateBinding Content}"
-                                                  VerticalAlignment="Center" Margin="0,4" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DptHover}" />
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DptSelection}" />
-                            </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource DptAccent}" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+        <Style x:Key="RowStyle" TargetType="ListViewItem" BasedOn="{StaticResource GridRowStyle}">
             <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
             <Setter Property="ToolTipService.InitialShowDelay" Value="900" />
             <EventSetter Event="MouseDoubleClick" Handler="OnRowDoubleClick" />

@@ -19,6 +19,7 @@ public sealed partial class HomePageViewModel : PageViewModel
     {
         Services.Locations.PinsChanged += OnPinsChanged;
         Services.Drives.Changed += OnDrivesChanged;
+        Services.Catalog.StatusChanged += OnCatalogStatus;
         Load();
     }
 
@@ -68,17 +69,37 @@ public sealed partial class HomePageViewModel : PageViewModel
         foreach (var d in Services.Drives.Volumes.Where(v => v.Type != DriveType.Network).Take(4)) Drives.Add(d);
     }
 
-    /// <summary>Filled from the catalog (M3). Kept as a hook so Home stays modest: three entries at most.</summary>
-    public Func<int, IReadOnlyList<LargestEntry>>? LargestProvider { get; set; } = LargestProviderDefault;
-
-    public static Func<int, IReadOnlyList<LargestEntry>>? LargestProviderDefault { get; set; }
-
-    private void LoadLargest()
+    private async void LoadLargest()
     {
-        Largest.Clear();
-        var items = LargestProvider?.Invoke(3) ?? [];
-        foreach (var i in items) Largest.Add(i);
+        var catalog = Services.Catalog.Catalog;
+        if (catalog is null || Services.Catalog.Status?.Volumes.Any(v => v.Selected && v.State == Dpt.Ipc.VolumeState.Ready) != true)
+        {
+            LargestNote = catalog is null
+                ? "Turn on the search catalog in Settings to see your largest files here."
+                : "Largest items appear here once the search catalog has scanned your drives.";
+            return;
+        }
+
+        try
+        {
+            var items = await catalog.GetLargestAsync(new Dpt.Ipc.LargestRequest { Kind = Dpt.Ipc.LargestKind.Files, Count = 3, IncludeHidden = false });
+            Largest.Clear();
+            foreach (var i in items) Largest.Add(new LargestEntry(i.Path, i.Name, SizeFormatter.Format(i.Size), i.IsFolder));
+        }
+        catch (Exception ex) when (ex is IOException or TimeoutException or InvalidOperationException)
+        {
+        }
+
         OnPropertyChanged(nameof(HasLargest));
+    }
+
+    private bool _largestLoaded;
+
+    private void OnCatalogStatus(object? sender, EventArgs e)
+    {
+        if (_largestLoaded || Services.Catalog.Status?.IsReady != true) return;
+        _largestLoaded = true;
+        System.Windows.Application.Current?.Dispatcher.BeginInvoke(LoadLargest);
     }
 
     private void OnPinsChanged(object? sender, EventArgs e) => Load();
@@ -154,6 +175,7 @@ public sealed partial class HomePageViewModel : PageViewModel
     {
         Services.Locations.PinsChanged -= OnPinsChanged;
         Services.Drives.Changed -= OnDrivesChanged;
+        Services.Catalog.StatusChanged -= OnCatalogStatus;
         base.Dispose();
     }
 }

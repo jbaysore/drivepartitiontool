@@ -16,6 +16,7 @@ public static class PageFactory
         [LocationKind.Home] = (t, _) => new HomePageViewModel(t),
         [LocationKind.Folder] = (t, l) => new FolderPageViewModel(t, l),
         [LocationKind.Settings] = (t, _) => new SettingsPageViewModel(t),
+        [LocationKind.Search] = (t, l) => new SearchPageViewModel(t, l),
     };
 
     public static void Register(LocationKind kind, Func<TabViewModel, Location, PageViewModel> factory) => Factories[kind] = factory;

@@ -24,6 +24,7 @@ public partial class App : Application
             ev.SetObserved();
         };
 
+        ServiceInstaller.RegisterCommands();
         if (CommandLine.TryRunCommand(e.Args, out var exitCode))
         {
             Shutdown(exitCode);
@@ -34,6 +35,8 @@ public partial class App : Application
         services.Theme.Initialize(services.Settings.Theme);
         services.FileOps.Dialogs = new WpfDialogService();
         services.Drives.Refresh();
+        _ = services.Catalog.InitializeAsync();
+        SettingsView.ExtraContent = () => new CatalogPanel { DataContext = new CatalogPanelViewModel() };
         Starting?.Invoke(services);
         Log.Info("App", "Started");
 
@@ -42,6 +45,13 @@ public partial class App : Application
         var window = new MainWindow { DataContext = main };
         MainWindow = window;
         window.Show();
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        try { AppServices.Current.Catalog.Dispose(); }
+        catch (InvalidOperationException) { }
+        base.OnExit(e);
     }
 
     private static void OnUnhandled(object sender, DispatcherUnhandledExceptionEventArgs e)
@@ -70,8 +80,15 @@ public static class CommandLine
     public static IReadOnlyList<Location> StartLocations(string[] args)
     {
         var list = new List<Location>();
-        foreach (var a in args)
+        for (var k = 0; k < args.Length; k++)
         {
+            var a = args[k];
+            if (a == "--search" && k + 1 < args.Length)
+            {
+                list.Add(Location.Search(args[++k], null));
+                continue;
+            }
+
             if (a.StartsWith("--", StringComparison.Ordinal)) continue;
             var p = a.Trim('"');
             if (Directory.Exists(p)) list.Add(Location.Folder(Path.GetFullPath(p)));

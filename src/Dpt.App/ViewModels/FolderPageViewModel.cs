@@ -229,10 +229,37 @@ public sealed partial class FolderPageViewModel : PageViewModel
 
         _ = Task.Run(async () =>
         {
+            // 1) Ask the catalog for everything at once (instant when the drive is catalogued).
+            var pending = folders.Where(f => f.SizePending).ToList();
+            try
+            {
+                var known = await Services.FolderSizes.FromCatalogAsync(pending.Select(f => f.Path).ToList(), cts.Token);
+                await Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    for (var k = 0; k < pending.Count && k < known.Count; k++)
+                    {
+                        if (known[k] is not { } s) continue;
+                        pending[k].SizePending = false;
+                        pending[k].Size = s;
+                    }
+
+                    if (SortColumn == SortColumn.Size) _reloadSortPending = true;
+                    UpdateStatus();
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or TimeoutException or InvalidOperationException)
+            {
+            }
+
+            // 2) Walk the rest in the background.
             foreach (var f in folders.Where(f => f.SizePending))
             {
                 if (cts.IsCancellationRequested) return;
-                var size = await Services.FolderSizes.GetAsync(f.Path, cts.Token);
+                var size = await Services.FolderSizes.WalkAsync(f.Path, cts.Token);
                 await Application.Current.Dispatcher.InvokeAsync(() =>
                 {
                     f.SizePending = false;

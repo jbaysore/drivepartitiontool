@@ -93,6 +93,12 @@ public sealed class AppSettings
     [Setting("Search", "Include hidden items in search", "Includes hidden files and folders in search results.", Order = 3)]
     public bool SearchIncludeHidden { get; set; } = false;
 
+    [Setting("Search", "Build the catalog inside the app", "When the background search service isn't installed, the app builds and updates the search catalog itself while it's open (slower first scan).", Order = 5)]
+    public bool UseLocalCatalog { get; set; } = true;
+
+    [Setting("Search", "Show search previews", "Shows a preview pane beside search results (Alt+P toggles it).", Order = 6)]
+    public bool ShowSearchPreview { get; set; } = false;
+
     [Setting("Search", "Type groups", "Extension groups used by type: filters. Format: group=ext,ext;group=ext", Order = 4, Advanced = true)]
     public string TypeGroups { get; set; } = Search.TypeGroups.DefaultDefinition;
 
