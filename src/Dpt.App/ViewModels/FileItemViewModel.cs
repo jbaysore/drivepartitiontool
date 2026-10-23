@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Runtime.InteropServices;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Dpt.App.Infrastructure;
@@ -17,6 +16,8 @@ public sealed partial class FileItemViewModel : ObservableObject
     private ImageSource? _thumbnail;
     private bool _thumbnailRequested;
     private string? _typeName;
+    private SortKey? _nameSortKey;
+    public SortKey NameSortKey => _nameSortKey ??= CultureInfo.CurrentCulture.CompareInfo.GetSortKey(Name, CompareOptions.IgnoreCase | CompareOptions.NumericOrdering);
 
     public FileItemViewModel(FileEntry entry, bool showExtension = true)
     {
@@ -120,6 +121,7 @@ public sealed partial class FileItemViewModel : ObservableObject
         if (nameChanged)
         {
             _typeName = null;
+            _nameSortKey = null;
             OnPropertyChanged(nameof(Name));
             OnPropertyChanged(nameof(DisplayName));
             OnPropertyChanged(nameof(TypeName));
@@ -129,9 +131,6 @@ public sealed partial class FileItemViewModel : ObservableObject
         OnPropertyChanged(nameof(ModifiedText));
     }
 
-    [DllImport("shlwapi.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
-    private static extern int StrCmpLogicalW(string psz1, string psz2);
-
-    /// <summary>Natural ("Explorer") name order: file2 before file10.</summary>
-    public static int CompareNames(string a, string b) => StrCmpLogicalW(a, b);
+    /// <summary>Culture-aware natural name order: file2 before file10. Precomputed keys avoid repeated native collation work.</summary>
+    public static int CompareNames(string a, string b) => CultureInfo.CurrentCulture.CompareInfo.Compare(a, b, CompareOptions.IgnoreCase | CompareOptions.NumericOrdering);
 }

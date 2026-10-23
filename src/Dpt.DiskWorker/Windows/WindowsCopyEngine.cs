@@ -10,7 +10,7 @@ namespace Dpt.DiskWorker.Windows;
 internal interface IWindowsCopyPlatform : IDisposable
 {
     string OpenSnapshot();
-    long Measure(string snapshot, IReadOnlyList<string> exclusions);
+    WindowsCopyMeasurement Measure(string snapshot, IReadOnlyList<string> exclusions);
     void Prepare(WindowsCopyLayout layout);
     void Capture(string snapshot, string exclusionConfig);
     void Apply();
@@ -18,6 +18,8 @@ internal interface IWindowsCopyPlatform : IDisposable
     void WriteBootFiles();
     void Verify();
 }
+
+internal sealed record WindowsCopyMeasurement(long SelectedBytes, long? RecoveryImageBytes = null);
 
 public static class WindowsCopyEngine
 {
@@ -79,8 +81,9 @@ public static class WindowsCopyEngine
                 ValidatePreflight(plan, source, target, options, virtualOnly);
                 var exclusions = WindowsCopyPlanning.ValidateExclusions(options.Exclusions).Concat(WindowsContentClassifier.AlwaysExcludedNames).ToList();
                 var snapshot = platform.OpenSnapshot();
-                var selectedBytes = platform.Measure(snapshot, exclusions);
-                var layout = WindowsCopyPlanning.Layout(options, target.Size, selectedBytes);
+                var measurement = platform.Measure(snapshot, exclusions);
+                var effective = options with { RecoverySizeMb = WindowsRecoveryPlanning.PartitionSizeMb(measurement.RecoveryImageBytes, options.RecoverySizeMb) };
+                var layout = WindowsCopyPlanning.Layout(effective, target.Size, measurement.SelectedBytes);
                 // Everything above is read-only on the source. Destination erasure begins here, after all preflight checks.
                 platform.Prepare(layout);
                 platform.Capture(snapshot, WindowsCopyPlanning.ExclusionConfig(options));

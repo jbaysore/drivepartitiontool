@@ -35,6 +35,7 @@
         <TextBlock Text="Clone a whole drive" Style="{StaticResource H2}" FontSize="17" />
         <TextBlock Text="{Binding Explanation}" TextWrapping="Wrap" Margin="0,6,0,14" />
 
+        <StackPanel x:Name="ChoicesPanel">
         <TextBlock Text="Copy from" FontWeight="SemiBold" />
         <ComboBox ItemsSource="{Binding Disks}" SelectedItem="{Binding Source}" DisplayMemberPath="Label" Margin="0,4,0,4" AutomationProperties.AutomationId="CloneSource" />
         <ContentControl Content="{Binding Source.Bar}" ContentTemplate="{StaticResource Bar}" />
@@ -46,6 +47,13 @@
         <TextBlock Text="{Binding DestinationWarning}" Foreground="{DynamicResource DptRed}" Margin="0,4,0,4" TextWrapping="Wrap" />
         <TextBlock Text="{Binding SizeNote}" Style="{StaticResource Small}" TextWrapping="Wrap" />
         <CheckBox Content="If the destination is bigger, grow the last partition into the extra space" IsChecked="{Binding ExtendLast}" Margin="0,8,0,0" />
+        <StackPanel Visibility="{Binding NeedsImages, Converter={StaticResource BoolToVisible}}" Margin="0,8,0,0">
+            <TextBlock Text="Temporary images (existing folder on a third drive; its files are left alone)" Style="{StaticResource Small}" TextWrapping="Wrap" />
+            <DockPanel Margin="0,4,0,0">
+                <Button DockPanel.Dock="Right" Content="Choose folder…" Click="OnChooseTemporaryFolder" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" />
+                <TextBox Text="{Binding TemporaryImageFolder, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.AutomationId="CloneTemporaryFolder" />
+            </DockPanel>
+        </StackPanel>
         <TextBlock Text="The disk Windows is running from can't be chosen as the destination." Style="{StaticResource Small}" Margin="0,6,0,0" />
 
         <Border Style="{StaticResource InfoPanel}" Margin="0,12,0,0">
@@ -54,6 +62,7 @@
 
         <TextBlock Margin="0,14,0,0" TextWrapping="Wrap"><Run Text="To confirm, type " /><Run Text="{Binding ExpectedConfirmation, Mode=OneWay}" FontWeight="Bold" /><Run Text=" (the destination)." /></TextBlock>
         <TextBox Text="{Binding Confirmation, UpdateSourceTrigger=PropertyChanged}" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0" AutomationProperties.AutomationId="CloneConfirm" />
+        </StackPanel>
 
         <StackPanel x:Name="ProgressPanel" Visibility="Collapsed" Margin="0,14,0,0">
             <ProgressBar x:Name="Progress" Style="{StaticResource Meter}" IsIndeterminate="True" Height="6" />

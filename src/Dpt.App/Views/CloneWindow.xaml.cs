@@ -18,11 +18,18 @@ public partial class CloneWindow : Window
     }
 
     private CloneViewModel Vm => (CloneViewModel)DataContext;
+    private void OnChooseTemporaryFolder(object sender, RoutedEventArgs e)
+    {
+        if (_running) return;
+        var picker = new Microsoft.Win32.OpenFolderDialog { Title = "Temporary clone images on a third drive" };
+        if (picker.ShowDialog(this) == true) Vm.TemporaryImageFolder = picker.FolderName;
+    }
 
     private async void OnRun(object sender, RoutedEventArgs e)
     {
         if (!Vm.CanRun) return;
         _running = true;
+        ChoicesPanel.IsEnabled = false;
         RunButton.IsEnabled = false;
         CancelButton.IsEnabled = false;
         ProgressPanel.Visibility = Visibility.Visible;
@@ -46,7 +53,9 @@ public partial class CloneWindow : Window
 
     public static Task ShowAsync(DiskInfo? source)
     {
+        Diagnostics.Log.Info("Clone", "Opening preview");
         new CloneWindow(new CloneViewModel(source)) { Owner = Application.Current.MainWindow }.ShowDialog();
+        Diagnostics.Log.Info("Clone", "Preview closed");
         return Task.CompletedTask;
     }
 }

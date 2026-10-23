@@ -44,6 +44,7 @@ public partial class MainWindow : Window
         Vm?.SaveTabs();
         var s = AppServices.Current;
         var busy = s.Activity.HasWorkInProgress;
+        Diagnostics.Log.Info("Close window", $"busy={busy}, automaticRules={s.RuleRunner.HasAutomaticRules}, keepInTray={s.Settings.KeepRunningInTray}, explicitExit={_exitRequested}");
         if (busy || !_exitRequested && s.Settings.KeepRunningInTray && s.RuleRunner.HasAutomaticRules)
         {
             // Keep automatic rules working: hide to the notification area instead of exiting.
@@ -62,6 +63,7 @@ public partial class MainWindow : Window
         if (!s.Activity.TryBeginShutdown()) { e.Cancel = true; return; }
 
         _tray?.Dispose();
+        Diagnostics.Log.Info("Close window", "Shutdown accepted");
     }
 
     public void HideToTray()

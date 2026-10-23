@@ -24,6 +24,7 @@ public sealed record PartitionInfo
     public bool IsBoot { get; init; }
     public bool IsSystem { get; init; }
     public bool IsHidden { get; init; }
+    public bool NoDefaultDriveLetter { get; init; }
     public string? VolumePath { get; init; }
     public string? Label { get; init; }
     public string? FileSystem { get; init; }

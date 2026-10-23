@@ -9,10 +9,10 @@ Goal: `GOAL_NO_ADMIN.md`. This checklist tracks the whole goal; unchecked work r
 - [x] M9 boot-repair preview and protected worker implementation, tested with fixtures/fakes (actual VHD repair/boot proof deferred).
 - [x] M10 opt-in/reversible folder association, isolated-registry tests, no live association changed.
 - [x] M10 taskbar and service install/upgrade guidance; logging/crash handling.
-- [ ] M10 self-contained publish script, built and inspected local package.
-- [ ] Performance: actual cold-start (<1.5 s), 50k-folder (<300 ms), 1M-search (<100 ms) measurements and any limitations.
-- [ ] Everyday workflow review and meaningful non-admin regression/UI checks.
-- [ ] Reconcile M8 smaller-destination and M9 recovery-partition deviations.
+- [x] M10 self-contained publish script, built and inspected local package (committed source `7b95af2`; later code needs a refreshed final package).
+- [x] Performance: real fresh-process startup (<1.5 s), full 50k-folder (<300 ms) and 1M-search median (<100 ms) measured; cold-cache limitation and reproduction are explicit in `PERFORMANCE.md`/`OWNER_VERIFICATION.md`.
+- [x] Everyday workflow review and meaningful non-admin regression/UI checks (file-operation confirmation/undo, rules/layouts, accessible navigation, job lifetime, clone/copy/boot previews and crash/registry isolation).
+- [x] Reconcile M8 smaller-destination and M9 recovery-partition deviations in implementation and ADR 0008; privileged verification remains deferred.
 - [ ] Full non-admin build/test run, progress updated, explicit admin/owner follow-up commands.
 - [ ] Task changes committed/pushed to main; final requirement-by-requirement completion audit.
 

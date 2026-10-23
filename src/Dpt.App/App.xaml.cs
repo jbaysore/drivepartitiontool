@@ -78,6 +78,7 @@ public partial class App : Application
         var main = new MainViewModel(start);
         services.RuleRunner.Notified += (_, message) => Dispatcher.BeginInvoke(() => main.ShowToast(message));
         var window = new MainWindow { DataContext = main, StartInTray = e.Args.Contains("--tray") };
+        window.ContentRendered += (_, _) => PerformanceLog.Startup();
         MainWindow = window;
         window.Show();
         if (_unattendedCrashTest)
@@ -86,6 +87,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        Log.Info("App", "Stopping views and services");
         try { if (MainWindow?.DataContext is IDisposable viewModel) viewModel.Dispose(); }
         catch (Exception ex) { Log.Error("Close views", ex); }
         AppServices.Shutdown();

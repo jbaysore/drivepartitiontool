@@ -17,7 +17,7 @@ public sealed class AppSession : IDisposable
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(15);
     private readonly Process _process;
 
-    public AppSession(string? startFolder = null, bool createSample = true, bool openFolder = true, string? arguments = null, Action<string>? prepare = null)
+    public AppSession(string? startFolder = null, bool createSample = true, bool openFolder = true, string? arguments = null, Action<string>? prepare = null, bool measurePerformance = false)
     {
         Root = Path.Combine(Path.GetTempPath(), "dpt-ui-tests", Guid.NewGuid().ToString("N"));
         DataDir = Path.Combine(Root, "data");
@@ -36,6 +36,7 @@ public sealed class AppSession : IDisposable
         var psi = new ProcessStartInfo(ExePath, arguments ?? (openFolder ? $"\"{Browse}\"" : "")) { UseShellExecute = false };
         psi.Environment["DPT_DATA_DIR"] = DataDir;
         psi.Environment["DPT_SAFETY"] = "virtual-only";
+        psi.Environment["DPT_MEASURE_PERF"] = measurePerformance ? "1" : "0";
         if (Environment.GetEnvironmentVariable("DPT_TEST_APP_EXE") is { Length: > 0 })
         {
             psi.Environment["DOTNET_ROOT"] = Path.Combine(Root, "no-external-runtime");
@@ -195,7 +196,8 @@ public sealed class AppSession : IDisposable
             if (!_process.HasExited)
             {
                 WaitUntil(() => Window.Properties.ItemStatus.ValueOrDefault == "Ready", "file/disk jobs finish before the test app exits");
-                try { Window.Close(); }
+                // Invoke the app's actual close control. WindowPattern.Close can be dropped during a modal provider's teardown.
+                try { Get("CloseAppButton").AsButton().Invoke(); }
                 catch (Exception) when (_process.HasExited && _process.ExitCode == 0) { }
                 if (!_process.WaitForExit(5000)) throw new TimeoutException("The test app did not exit after its file/disk jobs finished.");
             }
@@ -203,7 +205,14 @@ public sealed class AppSession : IDisposable
         }
         catch (Exception ex)
         {
-            closeError = ex;
+            var diagnostic = "";
+            try
+            {
+                diagnostic = string.Join("\n", Directory.EnumerateFiles(Path.Combine(DataDir, "logs"), "*.log").Select(File.ReadAllText));
+                if (!_process.HasExited) diagnostic += "\nWindows: " + string.Join(" | ", App.GetAllTopLevelWindows(Automation).Select(w => $"{w.Name} ({w.AutomationId}), enabled={w.IsEnabled}"));
+            }
+            catch (Exception) { }
+            closeError = new InvalidOperationException($"Data: {Root}\n{diagnostic}", ex);
         }
         finally
         {

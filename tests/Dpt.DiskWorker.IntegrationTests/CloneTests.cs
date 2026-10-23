@@ -20,8 +20,8 @@ public class CloneTests
             .Where(f => !f.Contains("System Volume Information", StringComparison.OrdinalIgnoreCase))
             .ToDictionary(f => Path.GetRelativePath(root, f), f => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(f))), StringComparer.OrdinalIgnoreCase);
 
-    private static DiskPlan ClonePlan(DiskInfo source, DiskInfo target, bool extend = true) => Plans.For(target,
-        new DiskStep { Kind = DiskStepKind.CloneDisk, Options = JsonSerializer.Serialize(new CloneOptions { ExtendLastPartition = extend }, PipeProtocol.Json) }) with
+    private static DiskPlan ClonePlan(DiskInfo source, DiskInfo target, bool extend = true, string? staging = null) => Plans.For(target,
+        new DiskStep { Kind = DiskStepKind.CloneDisk, Options = JsonSerializer.Serialize(new CloneOptions { ExtendLastPartition = extend, TemporaryImageFolder = staging }, PipeProtocol.Json) }) with
     {
         Source = Fingerprint.Of(source),
         ExpectedConfirmation = $"DISK {target.Number}",
@@ -101,5 +101,32 @@ public class CloneTests
         var plan = ClonePlan(Disk(source.DiskNumber), Disk(target.DiskNumber)) with { Confirmation = "yes" };
         Assert.Equal(DiskWorkerExit.RefusedConfirmation, Plans.RunWorker(plan).Code);
         Assert.Equal("KEEP2", Disk(target.DiskNumber).Partitions.Single(p => p.DriveLetter == target.Letter).Label);
+    }
+
+    [Fact]
+    public void Smaller_destination_uses_images_and_preserves_source_and_staging_files()
+    {
+        using var source = TestVhd.CreateSystemLike(600, "DPTSMALLSRC");
+        File.WriteAllText(Path.Combine(source.Root, "keep.txt"), "source content");
+        File.WriteAllText(Path.Combine(source.Root, "keep.txt:metadata"), "alternate stream");
+        Directory.CreateDirectory(Path.Combine(source.Root, "nested"));
+        File.WriteAllBytes(Path.Combine(source.Root, "nested", "data.bin"), new byte[12 * Mb]);
+        using var target = TestVhd.Create(400, "NTFS", "REPLACED");
+        using var stage = TestVhd.Create(900, "NTFS", "DPTSTAGE");
+        File.WriteAllText(Path.Combine(stage.Root, "leave.txt"), "unrelated staging file");
+        var src = Disk(source.DiskNumber); var hashes = Hashes(source.Root);
+        var result = Plans.RunWorker(ClonePlan(src, Disk(target.DiskNumber), staging: stage.Root));
+        Assert.True(result.Code == DiskWorkerExit.Ok, string.Join(" | ", result.Progress.Select(p => p.Message)));
+        var copy = Disk(target.DiskNumber);
+        var data = copy.Partitions.Single(p => p.FileSystem == "NTFS");
+        var root = data.Root ?? TestVhd.EnsureLetter(copy.Number, data.PartitionNumber);
+        Assert.Equal(hashes, Hashes(root));
+        Assert.Equal("alternate stream", File.ReadAllText(Path.Combine(root, "keep.txt:metadata")));
+        Assert.Equal(hashes, Hashes(source.Root));
+        Assert.Equal(Fingerprint.LayoutHash(src), Fingerprint.LayoutHash(Disk(src.Number)));
+        Assert.Equal("unrelated staging file", File.ReadAllText(Path.Combine(stage.Root, "leave.txt")));
+        Assert.Empty(Directory.GetDirectories(stage.Root, "dpt-clone-*"));
+        Assert.True(data.Size < src.Partitions.Single(p => p.FileSystem == "NTFS").Size);
+        Assert.NotEqual(src.UniqueId, copy.UniqueId);
     }
 }

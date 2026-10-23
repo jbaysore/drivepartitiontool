@@ -19,6 +19,7 @@ public static class DirectoryLister
             AttributesToSkip = skip,
             RecurseSubdirectories = false,
             ReturnSpecialDirectories = false,
+            BufferSize = 64 * 1024,
         });
 
         var list = new List<FileEntry>();

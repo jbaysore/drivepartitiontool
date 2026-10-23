@@ -23,9 +23,9 @@ public sealed record DiskChoice(DiskInfo Disk)
 /// <summary>Whole-drive clone: pick source and destination, see what happens to each, confirm by typing the destination's number.</summary>
 public sealed partial class CloneViewModel : ObservableObject
 {
-    public CloneViewModel(DiskInfo? preferredSource)
+    public CloneViewModel(DiskInfo? preferredSource, IReadOnlyList<DiskInfo>? disks = null)
     {
-        Disks = StorageInventory.GetDisks().Select(d => new DiskChoice(d)).ToList();
+        Disks = (disks ?? StorageInventory.GetDisks()).Select(d => new DiskChoice(d)).ToList();
         _source = Disks.FirstOrDefault(d => d.Disk.Number == preferredSource?.Number) ?? Disks.FirstOrDefault(d => d.Disk.HoldsWindows) ?? Disks.FirstOrDefault();
         UpdateDestinations();
     }
@@ -40,13 +40,15 @@ public sealed partial class CloneViewModel : ObservableObject
     [ObservableProperty] private string _confirmation = "";
     [ObservableProperty] private string? _problem;
     [ObservableProperty] private bool _canRun;
+    [ObservableProperty] private string _temporaryImageFolder = "";
+    public bool NeedsImages => Source is not null && Destination is not null && Destination.Disk.Size < Source.Disk.Partitions.Select(p => p.Offset + p.Size).DefaultIfEmpty().Max() + ClonePlanning.Mb;
 
     public string Explanation =>
-        "Cloning makes the destination drive an exact copy of the source: the same partitions, the same files and, when the source holds Windows, the ability to start Windows. " +
+        "Cloning copies the source's partitions and files. A smaller destination uses file images for NTFS data volumes, with sizes adjusted to fit. Windows boot files are rebuilt when needed; starting the copy still needs verification. " +
         "Everything currently on the destination is replaced. The source drive is only read, never changed.";
 
     public string Outcome =>
-        "Afterwards two identical copies exist. If you swap drives, choose the new one first in your PC's boot menu (BIOS/UEFI). " +
+        "Afterwards the source and its copy both contain the chosen drive's files. If you swap drives, choose the new one first in your PC's boot menu (BIOS/UEFI). " +
         "Keep only one of the two connected the first time you start from the copy.";
 
     public string ExpectedConfirmation => Destination is null ? "" : $"DISK {Destination.Disk.Number}";
@@ -59,6 +61,15 @@ public sealed partial class CloneViewModel : ObservableObject
         get
         {
             if (Source is null || Destination is null) return "";
+            if (NeedsImages)
+            {
+                try
+                {
+                    var layout = ClonePlanning.Layout(Source.Disk, Destination.Disk.Size);
+                    return $"The smaller destination fits the known used data and working space. NTFS volumes will be captured and applied; other partitions are copied raw. Temporary images need about {SizeFormatter.Format(layout.StagingBytes)} on a third disk; snapshots are measured and checked again before erasing anything.";
+                }
+                catch (ArgumentException ex) { return ex.Message; }
+            }
             var needed = Source.Disk.Partitions.Count == 0 ? 0 : Source.Disk.Partitions.Max(p => p.Offset + p.Size);
             var extra = Destination.Disk.Size - needed;
             return extra < 0
@@ -69,10 +80,11 @@ public sealed partial class CloneViewModel : ObservableObject
         }
     }
 
-    partial void OnSourceChanged(DiskChoice? value) => UpdateDestinations();
-    partial void OnDestinationChanged(DiskChoice? value) => Recompute();
-    partial void OnExtendLastChanged(bool value) => Recompute();
+    partial void OnSourceChanged(DiskChoice? value) { Confirmation = ""; UpdateDestinations(); }
+    partial void OnDestinationChanged(DiskChoice? value) { Confirmation = ""; Recompute(); }
+    partial void OnExtendLastChanged(bool value) { Confirmation = ""; Recompute(); }
     partial void OnConfirmationChanged(string value) => Recompute();
+    partial void OnTemporaryImageFolderChanged(string value) { Confirmation = ""; Recompute(); }
 
     private void UpdateDestinations()
     {
@@ -88,10 +100,16 @@ public sealed partial class CloneViewModel : ObservableObject
         OnPropertyChanged(nameof(ExpectedConfirmation));
         OnPropertyChanged(nameof(DestinationWarning));
         OnPropertyChanged(nameof(SizeNote));
-        var needed = Source?.Disk.Partitions.Count > 0 ? Source.Disk.Partitions.Max(p => p.Offset + p.Size) : 0;
+        OnPropertyChanged(nameof(NeedsImages));
+        string? layoutProblem = null;
+        if (Source is not null && Destination is not null)
+            try { _ = ClonePlanning.Layout(Source.Disk, Destination.Disk.Size); }
+            catch (Exception ex) when (ex is ArgumentException or OverflowException) { layoutProblem = ex.Message; }
         Problem = Source is null ? "Choose the drive to copy."
             : Destination is null ? "There is no other drive to copy to. Connect one first."
-            : Destination.Disk.Size < needed ? "The destination is too small for the source's partitions."
+            : Destination.Disk.IsReadOnly || Destination.Disk.IsOffline ? "Choose a writable, online destination."
+            : layoutProblem is not null ? layoutProblem
+            : NeedsImages && (!Path.IsPathFullyQualified(TemporaryImageFolder) || !Directory.Exists(TemporaryImageFolder)) ? "Choose an existing temporary-image folder on a third local disk. The worker checks its physical volume and space before capture."
             : DiskWorkerLauncher.VirtualOnly && !(Source.Disk.IsVirtual && Destination.Disk.IsVirtual) ? "Development/test mode: cloning works only between virtual disks."
             : !string.Equals(Confirmation.Trim(), ExpectedConfirmation, StringComparison.OrdinalIgnoreCase) ? $"Type {ExpectedConfirmation} to confirm."
             : null;
@@ -100,6 +118,8 @@ public sealed partial class CloneViewModel : ObservableObject
 
     public DiskPlan BuildPlan()
     {
+        Recompute();
+        if (!CanRun) throw new InvalidOperationException(Problem);
         var id = Guid.NewGuid().ToString("N");
         return new DiskPlan
         {
@@ -107,7 +127,7 @@ public sealed partial class CloneViewModel : ObservableObject
             Title = $"Clone disk {Source!.Disk.Number} to disk {Destination!.Disk.Number}",
             Target = Fingerprint.Of(Destination.Disk),
             Source = Fingerprint.Of(Source.Disk),
-            Steps = [new DiskStep { Kind = DiskStepKind.CloneDisk, Options = JsonSerializer.Serialize(new { ExtendLastPartition = ExtendLast, MakeBootable = true }, PipeProtocol.Json) }],
+            Steps = [new DiskStep { Kind = DiskStepKind.CloneDisk, Options = JsonSerializer.Serialize(new { ExtendLastPartition = ExtendLast, MakeBootable = true, TemporaryImageFolder = NeedsImages ? TemporaryImageFolder : null }, PipeProtocol.Json) }],
             StatusFile = DiskWorkerLauncher.NewStatusFile(id),
             ExpectedConfirmation = ExpectedConfirmation,
             Confirmation = Confirmation.Trim(),

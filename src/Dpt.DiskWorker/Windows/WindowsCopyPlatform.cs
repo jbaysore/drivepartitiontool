@@ -16,6 +16,8 @@ internal sealed class WindowsCopyPlatform(DiskInfo source, DiskInfo target, Wind
     private ShadowCopy? _shadow;
     private string? _workspace, _link, _image;
     private string _windows = "", _system = "", _recovery = "";
+    private int _recoveryPartition;
+    private string? _recoveryImage;
 
     private DiskInfo CurrentDestination()
     {
@@ -55,7 +57,7 @@ internal sealed class WindowsCopyPlatform(DiskInfo source, DiskInfo target, Wind
         return _link;
     }
 
-    public long Measure(string snapshot, IReadOnlyList<string> exclusions)
+    public WindowsCopyMeasurement Measure(string snapshot, IReadOnlyList<string> exclusions)
     {
         status.Write(DiskProgressState.Progress, "Checking selected content and temporary-image space before erasing the destination", 0.06);
         long bytes = 0;
@@ -72,7 +74,12 @@ internal sealed class WindowsCopyPlatform(DiskInfo source, DiskInfo target, Wind
             }
         }
         Walk(snapshot); // Permission/read errors abort before any destination write; partial counts are never accepted.
-        return bytes;
+        var images = new[] { Path.Combine(snapshot, @"Windows\System32\Recovery\Winre.wim") }
+            .Concat(source.Partitions.Where(p => p.Role == PartitionRole.Recovery && p.VolumePath is not null).Select(p => Path.Combine(p.VolumePath!, @"Recovery\WindowsRE\Winre.wim")));
+        _recoveryImage = images.FirstOrDefault(File.Exists);
+        if (_recoveryImage is not null && !File.Exists(Path.Combine(Environment.SystemDirectory, "reagentc.exe"))) throw new IOException("REAgentC is unavailable. The destination was not erased.");
+        if (options.Firmware == BootFirmware.Uefi && !File.Exists(Path.Combine(Environment.SystemDirectory, "diskpart.exe"))) throw new IOException("The recovery attribute tool is unavailable. The destination was not erased.");
+        return new(bytes, _recoveryImage is null ? null : new FileInfo(_recoveryImage).Length);
     }
 
     public void Prepare(WindowsCopyLayout layout)
@@ -96,7 +103,7 @@ internal sealed class WindowsCopyPlatform(DiskInfo source, DiskInfo target, Wind
             _letters.Add((number, root));
             if (part.Role == "Windows") _windows = root;
             else if (part.Role == "EFI") _system = root;
-            else if (part.Role == "Recovery") _recovery = root;
+            else if (part.Role == "Recovery") { _recovery = root; _recoveryPartition = number; }
         }
         if (options.Firmware == BootFirmware.Bios) _system = _windows;
     }
@@ -124,14 +131,28 @@ internal sealed class WindowsCopyPlatform(DiskInfo source, DiskInfo target, Wind
     public void CopyRecovery()
     {
         CurrentDestination();
-        var paths = new[] { Path.Combine(_windows, @"Windows\System32\Recovery\Winre.wim") }
-            .Concat(source.Partitions.Where(p => p.Role == PartitionRole.Recovery && p.VolumePath is not null).Select(p => Path.Combine(p.VolumePath!, @"Recovery\WindowsRE\Winre.wim")));
-        var image = paths.FirstOrDefault(File.Exists);
-        if (image is null) { status.Write(DiskProgressState.Progress, "Recovery space was created. The source recovery image was unavailable, so recovery tools were not registered.", 0.9); return; }
-        var folder = Path.Combine(_recovery, @"Recovery\WindowsRE");
-        Directory.CreateDirectory(folder);
-        File.Copy(image, Path.Combine(folder, "Winre.wim"));
-        Exec("reagentc.exe", "/setreimage", "/path", folder, "/target", Path.Combine(_windows, "Windows"));
+        if (_recoveryImage is not null)
+        {
+            var folder = Path.Combine(_recovery, @"Recovery\WindowsRE");
+            Directory.CreateDirectory(folder);
+            File.Copy(_recoveryImage, Path.Combine(folder, "Winre.wim"));
+            Exec("reagentc.exe", "/setreimage", "/path", folder, "/target", Path.Combine(_windows, "Windows"));
+        }
+        if (options.Firmware == BootFirmware.Uefi)
+        {
+            var part = CurrentDestination().Partitions.Single(p => p.PartitionNumber == _recoveryPartition);
+            if (!string.Equals(part.GptType, StorageInventory.GptRecovery, StringComparison.OrdinalIgnoreCase)) throw new IOException("The recovery partition type changed.");
+            var script = Path.Combine(_workspace!, "recovery-attributes.txt");
+            File.WriteAllText(script, WindowsRecoveryPlanning.AttributeScript(target.Number, _recoveryPartition), Encoding.ASCII);
+            try { Write(_ => Exec("diskpart.exe", "/s", script)); }
+            finally { File.Delete(script); }
+            if (!CurrentDestination().Partitions.Single(p => p.PartitionNumber == _recoveryPartition).NoDefaultDriveLetter)
+                throw new IOException("Windows did not preserve the recovery partition's no-default-letter attribute.");
+        }
+        File.WriteAllText(Path.Combine(_windows, "DrivePartitionTool-Recovery-" + Guid.NewGuid().ToString("N") + ".txt"), WindowsRecoveryPlanning.ActivationInstructions(_recoveryImage is not null));
+        status.Write(DiskProgressState.Progress, _recoveryImage is null
+            ? "Recovery space is reserved; the source recovery image was unavailable. Recovery tools are not registered."
+            : "Recovery image registered for the offline destination. Activate and verify it after booting the copy; see the recovery instructions on the destination.", 0.9);
     }
 
     public void WriteBootFiles()

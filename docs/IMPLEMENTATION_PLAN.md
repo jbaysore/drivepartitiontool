@@ -300,7 +300,7 @@ Each operation shows a before/after bar diagram, a plain-language "what will hap
 2. For each NTFS volume, take a **VSS snapshot** and copy **only the used clusters** (from `FSCTL_GET_VOLUME_BITMAP`) from the snapshot device to the matching destination partition.
 3. Copy other partitions (EFI FAT32, recovery) raw.
 4. If the destination is larger, extend the last data partition (setting: or leave the space unallocated).
-5. If the destination is smaller than the source disk but large enough for the used data, copy the affected data partition file-by-file through the M9 capture/apply path instead of block-by-block.
+5. If the destination is smaller than the source disk but large enough for the used data, copy NTFS data partitions through the capture/apply path instead of block-by-block. ADR 0008 requires temporary image space on a third local disk so the source stays unchanged and the smaller destination needs only applied content plus working space; snapshot measurements precede erasure.
 
 **Making it bootable:** when the source holds Windows, run `bcdboot <dest>\Windows /s <destEFI> /f UEFI` (or `/f BIOS` and set the partition active on MBR disks). Then run a verification step: the file systems mount, BCD points at the destination, and the sizes match.
 
@@ -338,11 +338,11 @@ Each operation shows a before/after bar diagram, a plain-language "what will hap
 
 ### M10 — Integration and release
 
-- Optional, opt-in setting "Open folders with DrivePartitionTool": registers `HKCU\Software\Classes\Folder\shell\open` and can be reverted with one click.
+- Optional, opt-in setting "Open folders with DrivePartitionTool": private per-user Folder/Directory/Drive verbs and reversible default selection (ADR 0007; built-in `open` commands are retained).
 - Taskbar pinning guidance.
 - Performance pass: cold start under 1.5 s, folder with 50k items under 300 ms.
 - Crash and log file at `%LOCALAPPDATA%\DrivePartitionTool\logs`.
-- `publish.ps1`: produces a self-contained single-folder build and installs or upgrades it via `--install-service`.
+- `publish.ps1`: produces and verifies a self-contained single-folder build. Installation/upgrade is an explicit owner/admin action via Settings or `--install-service` (ADR 0007).
 
 ## Safety rules (written into AGENTS.md; agents must obey them during development)
 

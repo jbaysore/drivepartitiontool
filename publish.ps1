@@ -67,3 +67,4 @@ Move-Item -LiteralPath $stage -Destination $package
 if ($Zip) { Compress-Archive -LiteralPath $package -DestinationPath ($package + '.zip') -CompressionLevel Optimal }
 Write-Host "Package: $package" -ForegroundColor Green
 Write-Host 'No service, folder association or taskbar setting was changed. See README.md for optional owner actions.'
+[pscustomobject]@{ PackageDirectory = $package }

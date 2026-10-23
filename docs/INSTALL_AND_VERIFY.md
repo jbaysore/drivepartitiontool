@@ -53,9 +53,10 @@ From the repository, the UI suite can target the printed package without changin
 ```powershell
 $env:DPT_TEST_APP_EXE = '<package directory>\DrivePartitionTool.exe'
 $env:DPT_SAFETY = 'virtual-only'
-dotnet test tests/Dpt.App.UITests --no-build --filter 'Category=UI'
+dotnet test tests/Dpt.App.UITests --no-build --filter 'Category=UI&Category!=Perf'
+dotnet test tests/Dpt.App.UITests -c Release --no-build --filter 'Category=Perf' --logger 'console;verbosity=detailed'
 ```
 
-The harness uses temporary app data/browse folders and checks the packaged app loads its own `coreclr.dll`, with the external runtime location disabled. Folder-registration tests use GUID-named test registry keys, never live folder associations. Elevated VHD and boot checks remain listed in `docs/PROGRESS.md` in the repository.
+The harness uses temporary app data/browse folders and checks the packaged app loads its own `coreclr.dll`, with the external runtime location disabled. Folder-registration tests use GUID-named test registry keys, never live folder associations. `PERFORMANCE.md` records what the timings cover and their cache/hardware limitations. Administrator/boot/integration follow-up commands are in `OWNER_VERIFICATION.md`; none are executed by package verification.
 
 References: [.NET self-contained publishing](https://learn.microsoft.com/en-us/dotnet/core/deploying/), [ReadyToRun](https://learn.microsoft.com/en-us/dotnet/core/deploying/ready-to-run), [per-user Shell registration](https://learn.microsoft.com/en-us/windows/win32/shell/fa-file-types).

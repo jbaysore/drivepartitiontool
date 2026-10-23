@@ -15,13 +15,14 @@ public class WindowsCopyWorkflowTests
     private static DiskPlan Plan() => new() { Id = "test", Title = "Copy", Source = Fingerprint.Of(Source), Target = Fingerprint.Of(Target),
         StatusFile = "unused", Steps = [new() { Kind = DiskStepKind.WindowsCopy }], ExpectedConfirmation = "DISK 4", Confirmation = "DISK 4" };
 
-    private sealed class Platform(string? failAt = null, long bytes = 100) : IWindowsCopyPlatform
+    private sealed class Platform(string? failAt = null, long bytes = 100, long? recoveryBytes = null) : IWindowsCopyPlatform
     {
         public List<string> Calls { get; } = [];
+        public WindowsCopyLayout? Layout { get; private set; }
         private void Call(string name) { Calls.Add(name); if (name == failAt) throw new IOException("test failure at " + name); }
         public string OpenSnapshot() { Call("snapshot"); return "snapshot"; }
-        public long Measure(string snapshot, IReadOnlyList<string> exclusions) { Assert.Contains("Games", exclusions); Call("measure"); return bytes; }
-        public void Prepare(WindowsCopyLayout layout) { Assert.Equal("Recovery", layout.Partitions.Last().Role); Call("prepare"); }
+        public WindowsCopyMeasurement Measure(string snapshot, IReadOnlyList<string> exclusions) { Assert.Contains("Games", exclusions); Call("measure"); return new(bytes, recoveryBytes); }
+        public void Prepare(WindowsCopyLayout layout) { Assert.Equal("Recovery", layout.Partitions.Last().Role); Layout = layout; Call("prepare"); }
         public void Capture(string snapshot, string config) { Assert.Contains("\\Games", config); Call("capture"); }
         public void Apply() => Call("apply");
         public void CopyRecovery() => Call("recovery");
@@ -69,6 +70,18 @@ public class WindowsCopyWorkflowTests
         var tooMuch = new Platform(bytes: Target.Size);
         Assert.Equal(DiskWorkerExit.Failed, WindowsCopyEngine.Execute(Plan(), Source, Target, Options, tooMuch, status, true));
         Assert.DoesNotContain("prepare", tooMuch.Calls);
+    }
+
+    [Fact]
+    public void Recovery_measurement_grows_the_partition_or_refuses_capacity_before_erasing()
+    {
+        using var status = new StatusWriter("");
+        var platform = new Platform(recoveryBytes: 1200 * WindowsCopyPlanning.Mb);
+        Assert.Equal(DiskWorkerExit.Ok, WindowsCopyEngine.Execute(Plan(), Source, Target, Options, platform, status, true));
+        Assert.Equal(1450 * WindowsCopyPlanning.Mb, platform.Layout!.Partitions.Last().Size);
+        var oversized = new Platform(recoveryBytes: 10_000 * WindowsCopyPlanning.Mb);
+        Assert.Equal(DiskWorkerExit.Failed, WindowsCopyEngine.Execute(Plan(), Source, Target, Options, oversized, status, true));
+        Assert.DoesNotContain("prepare", oversized.Calls);
     }
 
     [Fact]

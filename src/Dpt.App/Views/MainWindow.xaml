@@ -148,7 +148,7 @@
                     <Button Style="{StaticResource WindowButton}" Click="OnMaximize" ToolTip="Maximize" AutomationProperties.Name="Maximize">
                         <c:Icon x:Name="MaxIcon" Data="{StaticResource Icon.Maximize}" Size="12" StrokeWidth="1.5" />
                     </Button>
-                    <Button Style="{StaticResource CloseWindowButton}" Click="OnClose" ToolTip="Close" AutomationProperties.Name="Close">
+                    <Button Style="{StaticResource CloseWindowButton}" Click="OnClose" ToolTip="Close" AutomationProperties.Name="Close" AutomationProperties.AutomationId="CloseAppButton">
                         <c:Icon Data="{StaticResource Icon.X}" Size="13" StrokeWidth="1.5" />
                     </Button>
                 </StackPanel>
@@ -201,6 +201,7 @@
                     <!-- Address: breadcrumb, or a text box while editing -->
                     <Border Grid.Column="1" Style="{StaticResource BarBorder}" Margin="8,0" MouseLeftButtonUp="OnAddressClick" Cursor="IBeam">
                         <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <StackPanel Orientation="Horizontal" Visibility="{Binding IsEditingAddress, Converter={StaticResource BoolToCollapsed}}">
                                 <c:Icon Data="{Binding IconKey, Converter={StaticResource IconKey}}" Size="15" Foreground="{DynamicResource DptMuted}" Margin="0,0,6,0" />
                                 <ItemsControl ItemsSource="{Binding Breadcrumbs}" VerticalAlignment="Center" AutomationProperties.AutomationId="Breadcrumbs">
@@ -230,6 +231,16 @@
                                     <KeyBinding Key="Escape" Command="{Binding CancelAddressCommand}" />
                                 </TextBox.InputBindings>
                             </TextBox>
+                            <Button Grid.Column="1" Command="{Binding EditAddressCommand}" Style="{StaticResource IconButton}" Focusable="False"
+                                    Visibility="{Binding IsEditingAddress, Converter={StaticResource BoolToCollapsed}}" ToolTip="Edit address (Ctrl+L)"
+                                    AutomationProperties.AutomationId="EditAddressButton" AutomationProperties.Name="Edit address">
+                                <c:Icon Data="{StaticResource Icon.Pencil}" Size="13" />
+                            </Button>
+                            <Button Grid.Column="1" Command="{Binding CommitAddressCommand}" Style="{StaticResource IconButton}" Focusable="False"
+                                    Visibility="{Binding IsEditingAddress, Converter={StaticResource BoolToVisible}}" ToolTip="Open this address"
+                                    AutomationProperties.AutomationId="GoToAddressButton" AutomationProperties.Name="Open this address">
+                                <c:Icon Data="{StaticResource Icon.ArrowRight}" Size="13" />
+                            </Button>
                         </Grid>
                     </Border>
 

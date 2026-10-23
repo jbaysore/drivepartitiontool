@@ -94,6 +94,7 @@ public static class StorageInventory
             IsBoot = Bool(p, "IsBoot"),
             IsSystem = Bool(p, "IsSystem"),
             IsHidden = Bool(p, "IsHidden"),
+            NoDefaultDriveLetter = Bool(p, "NoDefaultDriveLetter"),
             VolumePath = vol is null ? null : Str(vol, "Path"),
             Label = vol is null ? null : Str(vol, "FileSystemLabel"),
             FileSystem = vol is null ? null : Str(vol, "FileSystem"),

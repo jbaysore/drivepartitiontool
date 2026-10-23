@@ -9,7 +9,7 @@ public sealed record WindowsCopyOptions
     public List<string> Exclusions { get; init; } = [];
     public bool MakeBootable { get; init; } = true;
     public BootFirmware Firmware { get; init; } = BootFirmware.Uefi;
-    public int EfiSizeMb { get; init; } = 260;
+    public int EfiSizeMb { get; init; } = 300;
     public int RecoverySizeMb { get; init; } = 1024;
 }
 
@@ -61,7 +61,7 @@ public static class WindowsCopyPlanning
         if (options.SourceRoot is not { Length: 3 } || !char.IsAsciiLetter(options.SourceRoot[0]) || options.SourceRoot[1] != ':' || options.SourceRoot[2] != '\\')
             throw new ArgumentException("Choose the root of a local Windows volume, such as C:\\.");
         if (!Enum.IsDefined(options.Firmware)) throw new ArgumentException("Unknown firmware type.");
-        if (options.EfiSizeMb is < 260 or > 4096) throw new ArgumentException("EFI size must be between 260 and 4096 MB.");
+        if (options.EfiSizeMb is < 300 or > 4096) throw new ArgumentException("EFI size must be between 300 and 4096 MB (including 4K-native disks).");
         if (options.RecoverySizeMb is < 1024 or > 16384) throw new ArgumentException("Recovery size must be between 1024 and 16384 MB.");
         if (options.Exclusions is null) throw new ArgumentException("The exclusion list is missing.");
         ValidateExclusions(options.Exclusions);

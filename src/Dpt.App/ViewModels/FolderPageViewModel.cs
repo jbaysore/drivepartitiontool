@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -100,17 +101,44 @@ public sealed partial class FolderPageViewModel : PageViewModel
 
     private async Task LoadAsync(bool preserve)
     {
+        var started = Stopwatch.GetTimestamp();
         _loadCts?.Cancel();
         var cts = _loadCts = new CancellationTokenSource();
         if (!preserve) IsLoading = true;
         var s = Services.Settings;
+        var column = SortColumn; var ascending = SortAscending; var foldersFirst = s.FoldersFirst;
         try
         {
-            var entries = await Task.Run(() => DirectoryLister.List(FolderPath, new ListOptions(s.ShowHiddenItems, s.ShowSystemItems), cts.Token), cts.Token);
+            var listing = await Task.Run(() =>
+            {
+                var entries = DirectoryLister.List(FolderPath, new ListOptions(s.ShowHiddenItems, s.ShowSystemItems), cts.Token);
+                var enumerationMs = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+                if (preserve) return new PreparedListing(entries, null, null, enumerationMs);
+                // Row models have no dispatcher affinity. Prepare the complete list while WPF builds the folder view.
+                var rows = entries.Select(e => new FileItemViewModel(e, s.ShowExtensions)).ToList();
+                var sorted = column == SortColumn.Type ? null : SortItems(rows, column, ascending, foldersFirst);
+                return new PreparedListing(entries, rows, sorted, enumerationMs);
+            }, cts.Token);
             if (cts.IsCancellationRequested) return;
             ErrorMessage = null;
-            ApplyEntries(entries, preserve, s.ShowExtensions);
+            if (preserve) ApplyEntries(listing.Entries, true, s.ShowExtensions);
+            else
+            {
+                _all = listing.Rows!;
+                Items.ReplaceAll(listing.Sorted is not null && column == SortColumn && ascending == SortAscending && foldersFirst == Services.Settings.FoldersFirst
+                    ? listing.Sorted : Sorted(_all));
+                RequestFolderSizes();
+            }
             EnsureWatcher();
+            if (!preserve && Diagnostics.PerformanceLog.Enabled)
+            {
+                var applicationMs = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+                // ContextIdle follows binding/layout/render work. All rows are materialized and sorted; only visible containers are virtualized.
+                _ = Application.Current.Dispatcher.BeginInvoke(() =>
+                {
+                    if (!cts.IsCancellationRequested) Diagnostics.PerformanceLog.Folder(started, listing.EnumerationMs, applicationMs, FolderPath, Items.Count);
+                }, DispatcherPriority.ContextIdle);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -130,6 +158,8 @@ public sealed partial class FolderPageViewModel : PageViewModel
             UpdateStatus();
         }
     }
+
+    private sealed record PreparedListing(List<FileEntry> Entries, List<FileItemViewModel>? Rows, List<FileItemViewModel>? Sorted, double EnumerationMs);
 
     private void ApplyEntries(List<FileEntry> entries, bool preserve, bool showExtensions)
     {
@@ -182,12 +212,14 @@ public sealed partial class FolderPageViewModel : PageViewModel
     }
 
     private IEnumerable<FileItemViewModel> Sorted(IEnumerable<FileItemViewModel> items)
+        => SortItems(items, SortColumn, SortAscending, Services.Settings.FoldersFirst);
+
+    private static List<FileItemViewModel> SortItems(IEnumerable<FileItemViewModel> items, SortColumn column, bool ascending, bool foldersFirst)
     {
-        var foldersFirst = Services.Settings.FoldersFirst;
         var comparer = Comparer<FileItemViewModel>.Create((a, b) =>
         {
             if (foldersFirst && a.IsFolder != b.IsFolder) return a.IsFolder ? -1 : 1;
-            var c = SortColumn switch
+            var c = column switch
             {
                 SortColumn.Modified => a.Modified.CompareTo(b.Modified),
                 SortColumn.Created => a.Created.CompareTo(b.Created),
@@ -195,8 +227,8 @@ public sealed partial class FolderPageViewModel : PageViewModel
                 SortColumn.Size => (a.Size ?? -1).CompareTo(b.Size ?? -1),
                 _ => 0,
             };
-            if (c == 0) c = FileItemViewModel.CompareNames(a.Name, b.Name);
-            return SortAscending ? c : -c;
+            if (c == 0) c = System.Globalization.SortKey.Compare(a.NameSortKey, b.NameSortKey);
+            return ascending ? c : -c;
         });
         var sorted = items.ToList();
         sorted.Sort(comparer);

@@ -48,6 +48,23 @@ if (-not $Elevated) {
     if ($NoUi) { $perfFilter += '&Category!=UI' }
     dotnet test tests\Dpt.Index.Tests -c $Configuration --no-build --nologo --filter $perfFilter --logger "console;verbosity=normal"
     if ($LASTEXITCODE -ne 0) { throw "Performance tests failed." }
+    if (-not $NoUi) {
+        # Measure the shipped ReadyToRun package, including its bundled runtime. Keep builds and other tests out of the timed processes.
+        if ($Configuration -ne 'Release') {
+            dotnet build tests\Dpt.App.UITests -c Release --nologo --disable-build-servers "-m:$MaxCpuCount" -v q
+            if ($LASTEXITCODE -ne 0) { throw "Release performance build failed." }
+        }
+        $previousPackage = $env:DPT_TEST_APP_EXE
+        try {
+            if (-not $previousPackage) {
+                $packages = @(& (Join-Path $PSScriptRoot 'publish.ps1') | Where-Object { $_.PSObject.Properties['PackageDirectory'] })
+                if ($packages.Count -ne 1) { throw 'Publishing did not return exactly one verified package.' }
+                $env:DPT_TEST_APP_EXE = Join-Path $packages[0].PackageDirectory 'DrivePartitionTool.exe'
+            }
+            dotnet test tests\Dpt.App.UITests -c Release --no-build --nologo --filter $perfFilter --logger "console;verbosity=detailed"
+            if ($LASTEXITCODE -ne 0) { throw "UI performance tests failed." }
+        } finally { $env:DPT_TEST_APP_EXE = $previousPackage }
+    }
     Write-Host "All tests passed ($filter, then $perfFilter)." -ForegroundColor Green
 } else {
     Write-Host "All tests passed ($filter)." -ForegroundColor Green

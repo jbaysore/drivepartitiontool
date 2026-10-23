@@ -206,6 +206,7 @@ public class SearchExecutorTests
         }
 
         var median = times.Order().ElementAt(2);
+        Console.WriteLine($"1M search median: {median:F1} ms; samples: {string.Join(", ", times.Select(t => t.ToString("F1")))} ms");
         Assert.True(median < 100, $"Median search took {median:F1} ms (all: {string.Join(", ", times.Select(t => t.ToString("F1")))})");
     }
 }

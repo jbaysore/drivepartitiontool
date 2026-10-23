@@ -12,6 +12,8 @@ public sealed record CloneOptions
 
     /// <summary>Rebuild boot files on the copy when the source holds Windows.</summary>
     public bool MakeBootable { get; init; } = true;
+    /// <summary>Existing folder on a third local disk, used only when the destination needs file-image cloning.</summary>
+    public string? TemporaryImageFolder { get; init; }
 }
 
 /// <summary>
@@ -27,16 +29,30 @@ public static class CloneEngine
 
     private static int Run(DiskPlan plan, DiskStep step, StatusWriter status)
     {
+        try { return RunCore(plan, step, status); }
+        catch (Exception ex) when (ex is JsonException or ArgumentException or OverflowException)
+        {
+            status.Write(DiskProgressState.Refused, "Invalid clone plan: " + ex.Message);
+            return DiskWorkerExit.BadArguments;
+        }
+    }
+
+    private static int RunCore(DiskPlan plan, DiskStep step, StatusWriter status)
+    {
         var options = step.Options is { Length: > 0 } json ? JsonSerializer.Deserialize<CloneOptions>(json, PipeProtocol.Json) ?? new() : new CloneOptions();
         var disks = StorageInventory.GetDisks();
-        var source = disks.Single(d => d.Number == plan.Source!.Number);
-        var target = disks.Single(d => d.Number == plan.Target.Number);
+        var source = disks.SingleOrDefault(d => d.Number == plan.Source?.Number) ?? throw new ArgumentException("The source disk is missing.");
+        var target = disks.SingleOrDefault(d => d.Number == plan.Target.Number) ?? throw new ArgumentException("The destination disk is missing.");
+        _ = ClonePlanning.Layout(source, target.Size);
+        SmallerCloneEngine.Validate(plan, source, target, SafetyMode.Current);
         var lastEnd = source.Partitions.Count == 0 ? 0 : source.Partitions.Max(p => p.Offset + p.Size);
         if (target.Size < lastEnd + Mb)
         {
-            status.Write(DiskProgressState.Failed, $"The destination ({target.Size / Mb:N0} MB) is smaller than the space the source's partitions use ({lastEnd / Mb:N0} MB). Nothing was changed.");
-            return DiskWorkerExit.Failed;
+            return SmallerCloneEngine.Execute(plan, source, target, options, new SmallerClonePlatform(source, target, options, status), status, SafetyMode.Current);
         }
+        if (options.MakeBootable)
+            foreach (var tool in source.PartitionStyle == "MBR" ? new[] { "bcdboot.exe", "bootsect.exe" } : ["bcdboot.exe"])
+                if (!File.Exists(Path.Combine(Environment.SystemDirectory, tool))) throw new IOException(tool + " is unavailable. The destination was not erased.");
 
         var totalBytes = source.Partitions.Sum(p => p.Used ?? p.Size);
         long copiedBytes = 0;
@@ -131,6 +147,7 @@ public static class CloneEngine
                 return;
             Thread.Sleep(500);
         }
+        throw new IOException("The cloned volumes did not become ready within 30 seconds.");
     }
 }
 
@@ -172,22 +189,35 @@ public static class BootFiles
             }
             else
             {
-                system = windows.Root;
+                var active = current.Partitions.FirstOrDefault(p => p.IsActive);
+                if (active is null) return "The MBR copy has no active system partition.";
+                system = active.Root ?? Assign(ops, disk, active.PartitionNumber, temp);
             }
 
             if (system is null) return "Couldn't give the boot partition a temporary drive letter.";
             status.Write(DiskProgressState.Progress, "Writing boot files", 0.96);
-            var psi = new ProcessStartInfo("bcdboot.exe", $"{windows.DriveLetter}:\\Windows /s {system.TrimEnd('\\')} /f {(gpt ? "UEFI" : "BIOS")}")
+            var psi = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "bcdboot.exe"))
             {
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true,
             };
+            foreach (var argument in new[] { $"{windows.DriveLetter}:\\Windows", "/s", system.TrimEnd('\\'), "/f", gpt ? "UEFI" : "BIOS" }) psi.ArgumentList.Add(argument);
             using var proc = Process.Start(psi)!;
-            var output = proc.StandardOutput.ReadToEnd() + proc.StandardError.ReadToEnd();
+            var stdout = proc.StandardOutput.ReadToEndAsync(); var stderr = proc.StandardError.ReadToEndAsync();
             proc.WaitForExit();
+            var output = stdout.GetAwaiter().GetResult() + stderr.GetAwaiter().GetResult();
             if (proc.ExitCode != 0) return "bcdboot couldn't write the boot files: " + output.Trim();
+            if (!File.Exists(Path.Combine(system, gpt ? @"EFI\Microsoft\Boot\BCD" : @"Boot\BCD"))) return "The destination BCD was not created.";
+            if (!gpt)
+            {
+                var bootsect = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "bootsect.exe")) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+                foreach (var argument in new[] { "/nt60", system.TrimEnd('\\'), "/mbr" }) bootsect.ArgumentList.Add(argument);
+                using var boot = Process.Start(bootsect) ?? throw new IOException("Could not start the BIOS boot-code tool.");
+                var bootOut = boot.StandardOutput.ReadToEndAsync(); var bootError = boot.StandardError.ReadToEndAsync(); boot.WaitForExit();
+                if (boot.ExitCode != 0) return "BIOS boot code could not be written: " + bootOut.GetAwaiter().GetResult() + bootError.GetAwaiter().GetResult();
+            }
             status.Write(DiskProgressState.Progress, "Boot files written: " + output.Trim(), 0.98);
             return null;
         }
