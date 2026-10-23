@@ -1,0 +1,82 @@
+<Window x:Class="Dpt.App.Views.WindowsCopyWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Copy Windows to another drive" Width="1020" Height="850" MinWidth="840" MinHeight="640"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{DynamicResource DptWindow}" Foreground="{DynamicResource DptInk}"
+        FontFamily="{StaticResource UiFont}" FontSize="13" AutomationProperties.AutomationId="WindowsCopyWindow">
+    <Grid Margin="22,18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" />
+            <RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <StackPanel>
+            <TextBlock Text="Copy Windows to another drive" Style="{StaticResource H2}" FontSize="18" />
+            <TextBlock Text="Choose what comes with Windows. Nothing is removed from the source; everything on the destination is replaced." TextWrapping="Wrap" Margin="0,6,0,12" />
+        </StackPanel>
+        <Grid x:Name="SelectionPanel" Grid.Row="1">
+            <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="12" /><ColumnDefinition /></Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="Windows volume to copy" FontWeight="SemiBold" />
+                <ComboBox ItemsSource="{Binding Sources}" SelectedItem="{Binding Source}" DisplayMemberPath="Label" Margin="0,4,0,6" AutomationProperties.AutomationId="WindowsCopySource" />
+                <Button Content="Load content and sizes" Style="{StaticResource SecondaryButton}" Click="OnLoad" HorizontalAlignment="Left" AutomationProperties.AutomationId="WindowsCopyLoad" />
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="Destination disk (erased)" FontWeight="SemiBold" />
+                <ComboBox ItemsSource="{Binding Destinations}" SelectedItem="{Binding Destination}" DisplayMemberPath="Label" Margin="0,4,0,6" AutomationProperties.AutomationId="WindowsCopyDestination" />
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Copy starts on: " VerticalAlignment="Center" />
+                    <ComboBox ItemsSource="{Binding FirmwareOptions}" SelectedItem="{Binding Firmware}" MinWidth="100" AutomationProperties.AutomationId="WindowsCopyFirmware" />
+                    <TextBlock Text="UEFI uses GPT; BIOS uses MBR." Style="{StaticResource Small}" Margin="10,0,0,0" VerticalAlignment="Center" />
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+        <Grid Grid.Row="2" Margin="0,12,0,10">
+            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+            <TextBlock Text="{Binding ScanMessage}" Style="{StaticResource Small}" Margin="0,0,0,6" TextWrapping="Wrap" AutomationProperties.AutomationId="WindowsCopyScanStatus" />
+            <DataGrid x:Name="ContentGrid" Grid.Row="1" ItemsSource="{Binding Items}" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                      HeadersVisibility="Column" EnableRowVirtualization="True" AutomationProperties.AutomationId="WindowsCopyContent">
+                <DataGrid.Columns>
+                    <DataGridTemplateColumn Header="Copy" Width="50">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate><CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanChoose}" HorizontalAlignment="Center" VerticalAlignment="Center" ToolTip="{Binding Consequence}" /></DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Group" Binding="{Binding Group}" Width="145" IsReadOnly="True" />
+                    <DataGridTextColumn Header="Content" Binding="{Binding Title}" Width="*" IsReadOnly="True">
+                        <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="ToolTip" Value="{Binding Consequence}" /><Setter Property="TextWrapping" Value="Wrap" /></Style></DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+                    <DataGridTextColumn Header="Size" Binding="{Binding SizeText}" Width="110" IsReadOnly="True" />
+                    <DataGridTextColumn Header="Preview" Binding="{Binding Disposition}" Width="145" IsReadOnly="True" />
+                </DataGrid.Columns>
+            </DataGrid>
+            <StackPanel Grid.Row="2" Margin="0,8,0,0">
+                <TextBlock Text="Hover over a content name for the consequence of leaving it out. Required Windows and account files are always kept." Style="{StaticResource Small}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding Notes}" Style="{StaticResource Small}" TextWrapping="Wrap" Margin="0,4,0,0" />
+            </StackPanel>
+        </Grid>
+        <StackPanel Grid.Row="3">
+            <TextBlock Text="{Binding SpaceNote}" TextWrapping="Wrap" AutomationProperties.AutomationId="WindowsCopySpace" />
+            <TextBlock Text="{Binding LayoutText}" Margin="0,4,0,6" TextWrapping="Wrap" AutomationProperties.AutomationId="WindowsCopyLayout" />
+            <TextBlock Text="{Binding Warning}" Foreground="{DynamicResource DptRed}" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding Outcome}" Style="{StaticResource Small}" TextWrapping="Wrap" Margin="0,4,0,6" />
+            <Button x:Name="BackupButton" Content="Copy excluded personal folders to another drive first…" Style="{StaticResource SecondaryButton}" Click="OnBackup"
+                    HorizontalAlignment="Left" IsEnabled="{Binding HasExcludedPersonal}" AutomationProperties.AutomationId="WindowsCopyBackup" />
+            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                <TextBlock VerticalAlignment="Center"><Run Text="To replace the destination, type " /><Run Text="{Binding ExpectedConfirmation, Mode=OneWay}" FontWeight="Bold" /></TextBlock>
+                <TextBox x:Name="ConfirmationBox" Text="{Binding Confirmation, UpdateSourceTrigger=PropertyChanged}" Width="150" Margin="10,0,0,0" AutomationProperties.AutomationId="WindowsCopyConfirm" />
+            </StackPanel>
+            <TextBlock Text="{Binding Problem}" Foreground="{DynamicResource DptAmber}" TextWrapping="Wrap" Margin="0,6,0,0" AutomationProperties.AutomationId="WindowsCopyProblem" />
+        </StackPanel>
+        <DockPanel Grid.Row="4" Margin="0,12,0,0">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button x:Name="CancelButton" Content="Close" IsCancel="True" Style="{StaticResource SecondaryButton}" Margin="8,0" />
+                <Button x:Name="RunButton" Content="Copy Windows" Style="{StaticResource DangerButton}" IsEnabled="{Binding CanRun}" Click="OnRun" AutomationProperties.AutomationId="WindowsCopyRun" />
+            </StackPanel>
+            <StackPanel>
+                <ProgressBar x:Name="Progress" Style="{StaticResource Meter}" Height="5" Visibility="Collapsed" />
+                <TextBlock x:Name="ResultText" TextWrapping="Wrap" Margin="0,5,0,0" AutomationProperties.AutomationId="WindowsCopyResult" />
+            </StackPanel>
+        </DockPanel>
+    </Grid>
+</Window>

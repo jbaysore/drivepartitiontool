@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Dpt.Core.WindowsCopy;
 using Dpt.DiskWorker.Windows;
 using Dpt.Ipc;
 using Dpt.Storage;
@@ -68,12 +69,13 @@ public class WindowsCopyTests
         Put("pagefile.sys", "not really a pagefile");
         var before = Hash(r);
 
-        using var target = TestVhd.Create(900, "NTFS", "OLD");
+        using var target = TestVhd.Create(2500, "NTFS", "OLD");
         var options = new WindowsCopyOptions
         {
             SourceRoot = r,
-            Exclusions = [@"Users\Alice\Pictures", @"Users\Alice\AppData", "Games", "pagefile.sys"],
+            Exclusions = [@"Users\Alice\Pictures", @"Users\Alice\AppData\Roaming\Browser", "Games", "pagefile.sys"],
             MakeBootable = false,
+            Firmware = WindowsCopyEngine.IsUefi() ? BootFirmware.Uefi : BootFirmware.Bios,
         };
         var dst = Disk(target.DiskNumber);
         var plan = Plans.For(dst, new DiskStep { Kind = DiskStepKind.WindowsCopy, Options = JsonSerializer.Serialize(options, PipeProtocol.Json) }) with
@@ -96,6 +98,7 @@ public class WindowsCopyTests
         }
 
         var win = copy.Partitions.Single(p => p.Label == "Windows");
+        Assert.Contains(copy.Partitions, p => p.Role == PartitionRole.Recovery && p.Size >= 1024L * 1024 * 1024);
         var root = win.Root ?? TestVhd.EnsureLetter(copy.Number, win.PartitionNumber);
         string P(string rel) => Path.Combine(root, rel);
         Assert.Equal("hive", File.ReadAllText(P(@"Windows\System32\config\SYSTEM")));
@@ -105,10 +108,10 @@ public class WindowsCopyTests
         Assert.Equal("alice hive", File.ReadAllText(P(@"Users\Alice\NTUSER.DAT")));
         Assert.True(File.Exists(P(@"Users\Public\Documents\shared.txt")));
         Assert.False(Directory.Exists(P(@"Users\Alice\Pictures")));
-        Assert.False(Directory.Exists(P(@"Users\Alice\AppData")));
+        Assert.False(Directory.Exists(P(@"Users\Alice\AppData\Roaming\Browser")));
         Assert.False(Directory.Exists(P("Games")));
         Assert.False(File.Exists(P("pagefile.sys")));
-        Assert.False(File.Exists(P("dpt-transfer.wim")));
+        Assert.Empty(Directory.EnumerateFiles(root, "dpt-transfer-*.wim"));
         // Hard links survive as hard links (important for Windows' component store).
         Assert.Equal(2u, Links(P(@"Windows\System32\library.dll")));
     }

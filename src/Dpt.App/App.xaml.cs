@@ -42,6 +42,7 @@ public partial class App : Application
         RulesPageViewModel.EditRule = RuleEditorWindow.EditAsync;
         DiskToolsPageViewModel.ShowAction = PartitionActionWindow.ShowAsync;
         DiskToolsPageViewModel.ShowClone = CloneWindow.ShowAsync;
+        DiskToolsPageViewModel.ShowWindowsCopy = WindowsCopyWindow.ShowAsync;
         RulesPageViewModel.PreviewRule = RulePreviewWindow.ShowAsync;
         SearchPageViewModel.CategoryResolver = services.Categories.ResolveForSearchAsync;
         services.RuleRunner.Start();
