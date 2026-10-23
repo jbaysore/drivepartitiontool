@@ -40,6 +40,7 @@ public partial class App : Application
         FolderPageViewModel.BulkRename = BulkRenameWindow.RunAsync;
         FolderPageViewModel.Categorize = CategorizeWindow.Show;
         RulesPageViewModel.EditRule = RuleEditorWindow.EditAsync;
+        DiskToolsPageViewModel.ShowAction = PartitionActionWindow.ShowAsync;
         RulesPageViewModel.PreviewRule = RulePreviewWindow.ShowAsync;
         SearchPageViewModel.CategoryResolver = services.Categories.ResolveForSearchAsync;
         services.RuleRunner.Start();

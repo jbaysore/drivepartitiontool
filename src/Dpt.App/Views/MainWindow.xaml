@@ -39,6 +39,9 @@
         <DataTemplate DataType="{x:Type vm:LayoutsPageViewModel}">
             <v:LayoutsView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:DiskToolsPageViewModel}">
+            <v:DiskToolsView />
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:PlaceholderPageViewModel}">
             <v:PlaceholderView />
         </DataTemplate>

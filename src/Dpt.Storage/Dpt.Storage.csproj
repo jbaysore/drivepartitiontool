@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Dpt.Core\Dpt.Core.csproj" />
+    <ProjectReference Include="..\Dpt.Ipc\Dpt.Ipc.csproj" />
   </ItemGroup>
 
   <ItemGroup>

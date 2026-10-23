@@ -20,6 +20,7 @@ public static class PageFactory
         [LocationKind.Drives] = (t, _) => new DrivesPageViewModel(t),
         [LocationKind.Rules] = (t, _) => new RulesPageViewModel(t),
         [LocationKind.Layouts] = (t, l) => new LayoutsPageViewModel(t, l),
+        [LocationKind.DiskTools] = (t, _) => new DiskToolsPageViewModel(t),
         [LocationKind.LargestItems] = (t, l) => new LargestPageViewModel(t, l),
     };
 

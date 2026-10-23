@@ -1,0 +1,127 @@
+<UserControl x:Class="Dpt.App.Views.DiskToolsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:Dpt.App.Controls"
+             AutomationProperties.AutomationId="DiskToolsView">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="26,24,26,27" MaxWidth="1150">
+            <TextBlock Text="Disk tools" Style="{StaticResource PageTitle}" />
+            <TextBlock Text="{Binding PartitionExplanation}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12" />
+            <Border Style="{StaticResource InfoPanel}" Margin="0,0,0,14" Visibility="{Binding IsDevelopmentBuild, Converter={StaticResource BoolToVisible}}">
+                <TextBlock Text="{Binding DevelopmentNote}" TextWrapping="Wrap" Foreground="{DynamicResource DptAmber}" />
+            </Border>
+
+            <!-- Big tasks -->
+            <UniformGrid Columns="3" Margin="0,0,0,18">
+                <Button Style="{StaticResource RowButton}" Command="{Binding CloneCommand}" Margin="0,0,10,0" AutomationProperties.AutomationId="CloneDiskTask">
+                    <StackPanel Margin="4,10">
+                        <StackPanel Orientation="Horizontal">
+                            <c:Icon Data="{StaticResource Icon.Clone}" Size="18" Foreground="{DynamicResource DptAccent}" />
+                            <TextBlock Text="Clone a whole drive" Style="{StaticResource H2}" Margin="8,0,0,0" />
+                        </StackPanel>
+                        <TextBlock Text="Make an identical copy on another drive, to keep two copies or to replace it." Style="{StaticResource Small}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource RowButton}" Command="{Binding WindowsCopyCommand}" Margin="0,0,10,0" AutomationProperties.AutomationId="WindowsCopyTask">
+                    <StackPanel Margin="4,10">
+                        <StackPanel Orientation="Horizontal">
+                            <c:Icon Data="{StaticResource Icon.Layers}" Size="18" Foreground="{DynamicResource DptAccent}" />
+                            <TextBlock Text="Copy Windows to another drive" Style="{StaticResource H2}" Margin="8,0,0,0" />
+                        </StackPanel>
+                        <TextBlock Text="Choose what comes along (programs, settings, personal folders). The current drive isn't changed." Style="{StaticResource Small}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource RowButton}" Command="{Binding BootHealthCommand}" AutomationProperties.AutomationId="BootHealthTask">
+                    <StackPanel Margin="4,10">
+                        <StackPanel Orientation="Horizontal">
+                            <c:Icon Data="{StaticResource Icon.Power}" Size="18" Foreground="{DynamicResource DptAccent}" />
+                            <TextBlock Text="Boot health" Style="{StaticResource H2}" Margin="8,0,0,0" />
+                        </StackPanel>
+                        <TextBlock Text="See how this PC starts Windows, and rebuild boot files if starting fails." Style="{StaticResource Small}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                    </StackPanel>
+                </Button>
+            </UniformGrid>
+
+            <TextBlock Text="Partitions" Style="{StaticResource H2}" Margin="0,0,0,8" />
+            <ItemsControl ItemsSource="{Binding Disks}" AutomationProperties.AutomationId="DiskToolDisks">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,12" AutomationProperties.Name="{Binding Info.Title}">
+                            <StackPanel>
+                                <TextBlock Text="{Binding Info.Title}" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding Info.Subtitle}" Style="{StaticResource Small}" />
+                                <Border Margin="0,10,0,0" Height="44" CornerRadius="6" ClipToBounds="True" Background="{DynamicResource DptPanelSoft}">
+                                    <ItemsControl ItemsSource="{Binding Segments}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <c:ProportionalPanel MinItemWidth="34" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemContainerStyle>
+                                            <Style TargetType="ContentPresenter">
+                                                <Setter Property="c:ProportionalPanel.Weight" Value="{Binding Weight}" />
+                                            </Style>
+                                        </ItemsControl.ItemContainerStyle>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Command="{Binding DataContext.SelectCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"
+                                                        ToolTip="{Binding Detail}" Cursor="Hand" AutomationProperties.Name="{Binding Detail}"
+                                                        HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border x:Name="Bd" Background="{Binding BrushKey, Converter={StaticResource BrushKey}}" BorderBrush="{DynamicResource DptWindow}" BorderThickness="0,0,2,0" Opacity="0.8">
+                                                                <TextBlock Text="{Binding Label}" Foreground="White" FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center" Margin="6,0" />
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter TargetName="Bd" Property="Opacity" Value="1" />
+                                                                </Trigger>
+                                                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                    <Setter TargetName="Bd" Property="Opacity" Value="1" />
+                                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource DptInk}" />
+                                                                    <Setter TargetName="Bd" Property="BorderThickness" Value="3" />
+                                                                </DataTrigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Actions for the selection -->
+            <Border Style="{StaticResource Card}" Margin="0,4,0,0">
+                <StackPanel>
+                    <TextBlock Text="{Binding SelectionTitle}" Style="{StaticResource H2}" AutomationProperties.AutomationId="DiskSelection" />
+                    <TextBlock Text="{Binding SelectionNote}" Foreground="{DynamicResource DptAmber}" TextWrapping="Wrap" Margin="0,4,0,0"
+                               Visibility="{Binding SelectionNote, Converter={StaticResource NullToCollapsed}}" />
+                    <ItemsControl ItemsSource="{Binding Actions}" Margin="0,8,0,0" AutomationProperties.AutomationId="DiskActions">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="{DynamicResource DptBorder}" BorderThickness="0,1,0,0" Padding="0,8">
+                                    <DockPanel>
+                                        <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Open" VerticalAlignment="Center"
+                                                IsEnabled="{Binding Enabled}" AutomationProperties.Name="{Binding Title}"
+                                                Command="{Binding DataContext.RunCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                                        <StackPanel Margin="0,0,12,0">
+                                            <TextBlock Text="{Binding Title}" FontWeight="Medium" />
+                                            <TextBlock Text="{Binding Description}" Style="{StaticResource Small}" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding DisabledReason}" FontSize="11" Foreground="{DynamicResource DptAmber}"
+                                                       Visibility="{Binding DisabledReason, Converter={StaticResource NullToCollapsed}}" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

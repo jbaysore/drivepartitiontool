@@ -21,6 +21,7 @@
     <ProjectReference Include="..\Dpt.Index\Dpt.Index.csproj" />
     <!-- Built alongside the app and copied to .\service so the installer can register it. -->
     <ProjectReference Include="..\Dpt.IndexService\Dpt.IndexService.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\Dpt.DiskWorker\Dpt.DiskWorker.csproj" ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
 
   <Target Name="CopyCatalogService" AfterTargets="Build">
@@ -28,6 +29,10 @@
       <CatalogServiceFiles Include="$(MSBuildThisFileDirectory)..\Dpt.IndexService\bin\$(Configuration)\net10.0-windows\**\*" />
     </ItemGroup>
     <Copy SourceFiles="@(CatalogServiceFiles)" DestinationFiles="@(CatalogServiceFiles->'$(OutDir)service\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <DiskWorkerFiles Include="$(MSBuildThisFileDirectory)..\Dpt.DiskWorker\bin\$(Configuration)\net10.0-windows\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DiskWorkerFiles)" DestinationFiles="@(DiskWorkerFiles->'$(OutDir)diskworker\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
   </Target>
 
   <ItemGroup>
