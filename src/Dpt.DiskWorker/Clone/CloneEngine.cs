@@ -51,7 +51,7 @@ public static class CloneEngine
             return SmallerCloneEngine.Execute(plan, source, target, options, new SmallerClonePlatform(source, target, options, status), status, SafetyMode.Current);
         }
         if (options.MakeBootable)
-            foreach (var tool in source.PartitionStyle == "MBR" ? new[] { "bcdboot.exe", "bootsect.exe" } : ["bcdboot.exe"])
+            foreach (var tool in BootFiles.ToolsFor(source))
                 if (!File.Exists(Path.Combine(Environment.SystemDirectory, tool))) throw new IOException(tool + " is unavailable. The destination was not erased.");
 
         var totalBytes = source.Partitions.Sum(p => p.Used ?? p.Size);
@@ -154,6 +154,13 @@ public static class CloneEngine
 /// <summary>Rebuilds Windows boot files (bcdboot) on a disk that holds a copy of Windows.</summary>
 public static class BootFiles
 {
+    internal static IReadOnlyList<string> ToolsFor(DiskInfo source)
+    {
+        var hasWindows = source.HoldsWindows || source.Partitions.Any(p => p.FileSystem == "NTFS" && (p.Root ?? p.VolumePath) is { } root &&
+            File.Exists(Path.Combine(root, @"Windows\System32\config\SYSTEM")));
+        return !hasWindows ? [] : source.PartitionStyle == "MBR" ? ["bcdboot.exe", "bootsect.exe"] : ["bcdboot.exe"];
+    }
+
     /// <summary>Returns an error message, or null when done (or when the copy holds no Windows).</summary>
     public static string? RebuildIfWindows(StorageOperations ops, int disk, IReadOnlyList<(PartitionInfo Source, int TargetNumber)> map, StatusWriter status)
     {

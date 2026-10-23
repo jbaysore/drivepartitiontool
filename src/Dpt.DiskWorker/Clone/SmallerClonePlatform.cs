@@ -60,7 +60,7 @@ internal sealed class SmallerClonePlatform(DiskInfo source, DiskInfo target, Clo
     public IReadOnlyDictionary<int, long> SnapshotAndMeasure(CloneLayout layout)
     {
         Source(); Destination(); Stage(layout.StagingBytes);
-        foreach (var tool in options.MakeBootable ? (source.PartitionStyle == "MBR" ? new[] { "dism.exe", "bcdboot.exe", "bootsect.exe" } : ["dism.exe", "bcdboot.exe"]) : ["dism.exe"])
+        foreach (var tool in new[] { "dism.exe" }.Concat(options.MakeBootable ? BootFiles.ToolsFor(source) : []))
             if (!File.Exists(Path.Combine(Environment.SystemDirectory, tool))) throw new IOException(tool + " is unavailable; the destination was not erased.");
         var neededLetters = layout.Partitions.Count(p => p.Capture) + (options.MakeBootable ? 1 : 0);
         if ("RSTUVWXYZQPONMLKJIHGFED".Count(c => !DriveInfo.GetDrives().Any(d => char.ToUpperInvariant(d.Name[0]) == c)) < neededLetters)

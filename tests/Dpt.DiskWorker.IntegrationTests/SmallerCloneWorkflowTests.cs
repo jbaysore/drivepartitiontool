@@ -19,6 +19,16 @@ public class SmallerCloneWorkflowTests
         StatusFile = "unused", ExpectedConfirmation = "DISK 4", Confirmation = "disk 4" };
     private static readonly CloneOptions Options = new() { TemporaryImageFolder = @"S:\temporary-images" };
 
+    [Fact]
+    public void Data_disk_cloning_does_not_require_a_Windows_boot_code_tool()
+    {
+        var data = new DiskInfo { PartitionStyle = "MBR", Partitions = [new() { Role = PartitionRole.Data, FileSystem = "NTFS" }] };
+        Assert.Empty(BootFiles.ToolsFor(data));
+        var windows = data with { Partitions = [new() { Role = PartitionRole.Windows, FileSystem = "NTFS" }] };
+        Assert.Equal(["bcdboot.exe", "bootsect.exe"], BootFiles.ToolsFor(windows));
+        Assert.Equal(["bcdboot.exe"], BootFiles.ToolsFor(windows with { PartitionStyle = "GPT" }));
+    }
+
     private sealed class Platform(string? fail = null, long bytes = 100 * Mb) : ISmallerClonePlatform
     {
         public List<string> Calls { get; } = [];
