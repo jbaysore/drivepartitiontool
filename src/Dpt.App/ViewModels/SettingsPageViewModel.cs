@@ -113,7 +113,8 @@ public sealed partial class SettingsPageViewModel : PageViewModel
 {
     public SettingsPageViewModel(TabViewModel tab) : base(tab, Location.Page(LocationKind.Settings))
     {
-        var settings = Services.Settings;
+        var settings = Services.Settings.Clone();
+        settings.DefaultFolderHandler = Services.FolderAssociation.IsEnabled;
         var items = typeof(AppSettings).GetProperties()
             .Select(p => (Property: p, Meta: p.GetCustomAttribute<SettingAttribute>()))
             .Where(x => x.Meta is not null)
@@ -121,6 +122,7 @@ public sealed partial class SettingsPageViewModel : PageViewModel
             .ToList();
         foreach (var group in items.GroupBy(i => i.Item1.Section))
             Sections.Add(new SettingSection(group.Key, group.OrderBy(i => i.Item1.Advanced).ThenBy(i => i.Item1.Order).Select(i => i.Item).ToList()));
+        Services.SettingsChanged += OnSettingsChanged;
     }
 
     public override string IconKey => "Icon.Settings";
@@ -130,16 +132,32 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     public Func<string?>? ExtraInfo { get; set; }
 
     public string DataFolder => Data.AppDatabase.DefaultDataDirectory;
+    private void OnSettingsChanged(object? sender, AppSettings settings)
+    {
+        foreach (var item in Sections.SelectMany(s => s.Items)) { item.Load(settings); item.Error = null; }
+    }
+    public override void Dispose() { Services.SettingsChanged -= OnSettingsChanged; base.Dispose(); }
 
     private void OnItemChanged(SettingItemViewModel item)
     {
         var copy = Services.Settings.Clone();
         if (!item.TryApply(copy)) return;
+        string? integrationNote = null;
+        if (item.Key == nameof(AppSettings.DefaultFolderHandler))
+        {
+            try { integrationNote = Services.FolderAssociation.SetEnabled(copy.DefaultFolderHandler); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException or InvalidOperationException or ArgumentException)
+            {
+                var actual = Services.Settings.Clone(); actual.DefaultFolderHandler = Services.FolderAssociation.IsEnabled;
+                item.Load(actual); item.Error = "Folder integration was not changed completely: " + ex.Message;
+                return;
+            }
+        }
         Services.SaveSettings(copy);
         if (item.Key == nameof(AppSettings.Theme)) Services.Theme.Apply(copy.Theme);
         // Only touch the real sign-in entry when the owner flips this switch.
         if (item.Key == nameof(AppSettings.StartAtSignIn)) SignInStartup.Apply(copy.StartAtSignIn);
         if (item.Key == nameof(AppSettings.PauseAutomaticRules)) Services.RuleRunner.RefreshWatchers();
-        StatusText = "Saved";
+        StatusText = integrationNote ?? "Saved";
     }
 }

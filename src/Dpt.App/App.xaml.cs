@@ -10,19 +10,36 @@ namespace Dpt.App;
 
 public partial class App : Application
 {
+    public static bool IsFailing { get; private set; }
+    private bool _unattendedCrashTest;
     /// <summary>Extension point for later milestones: runs after services exist, before the window opens.</summary>
     public static event Action<AppServices>? Starting;
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        base.OnStartup(e);
         DispatcherUnhandledException += OnUnhandled;
-        AppDomain.CurrentDomain.UnhandledException += (_, ev) => Log.Error("Unhandled", ev.ExceptionObject.ToString() ?? "");
+        AppDomain.CurrentDomain.UnhandledException += (_, ev) =>
+        {
+            var error = ev.ExceptionObject as Exception ?? new Exception(ev.ExceptionObject.ToString());
+            Log.Error("Unhandled", error); Log.WriteCrashReport(error, "Background process failure");
+        };
         TaskScheduler.UnobservedTaskException += (_, ev) =>
         {
             Log.Error("UnobservedTask", ev.Exception);
             ev.SetObserved();
         };
+
+        try
+        {
+            var data = Environment.GetEnvironmentVariable("DPT_DATA_DIR");
+            _unattendedCrashTest = e.Args.Contains("--diagnostics-test-crash") && data is not null && Path.GetFullPath(data).StartsWith(Path.GetFullPath(Path.GetTempPath()).TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase);
+            base.OnStartup(e); StartApplication(e);
+        }
+        catch (Exception ex) { Fail(ex, "Startup"); }
+    }
+
+    private void StartApplication(StartupEventArgs e)
+    {
 
         ServiceInstaller.RegisterCommands();
         if (CommandLine.TryRunCommand(e.Args, out var exitCode))
@@ -47,7 +64,13 @@ public partial class App : Application
         RulesPageViewModel.PreviewRule = RulePreviewWindow.ShowAsync;
         SearchPageViewModel.CategoryResolver = services.Categories.ResolveForSearchAsync;
         services.RuleRunner.Start();
-        SettingsView.ExtraContent = () => new CatalogPanel { DataContext = new CatalogPanelViewModel() };
+        SettingsView.ExtraContent = () =>
+        {
+            var panels = new System.Windows.Controls.StackPanel();
+            panels.Children.Add(new CatalogPanel { DataContext = new CatalogPanelViewModel(), Margin = new Thickness(0, 0, 0, 12) });
+            panels.Children.Add(new IntegrationPanel());
+            return panels;
+        };
         Starting?.Invoke(services);
         Log.Info("App", "Started");
 
@@ -57,21 +80,35 @@ public partial class App : Application
         var window = new MainWindow { DataContext = main, StartInTray = e.Args.Contains("--tray") };
         MainWindow = window;
         window.Show();
+        if (_unattendedCrashTest)
+            Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() => throw new InvalidOperationException("Intentional diagnostics test exception.")));
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
-        try { AppServices.Current.Catalog.Dispose(); }
-        catch (InvalidOperationException) { }
+        try { if (MainWindow?.DataContext is IDisposable viewModel) viewModel.Dispose(); }
+        catch (Exception ex) { Log.Error("Close views", ex); }
+        AppServices.Shutdown();
+        Log.Info("App", $"Exited ({e.ApplicationExitCode})");
         base.OnExit(e);
     }
 
-    private static void OnUnhandled(object sender, DispatcherUnhandledExceptionEventArgs e)
+    private void OnUnhandled(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        Log.Error("Dispatcher", e.Exception);
-        MessageBox.Show($"Something went wrong:\n\n{e.Exception.Message}\n\nDetails were written to:\n{Log.CurrentFile}",
-            "DrivePartitionTool", MessageBoxButton.OK, MessageBoxImage.Warning);
         e.Handled = true;
+        Fail(e.Exception, "UI dispatcher");
+    }
+
+    private void Fail(Exception exception, string context)
+    {
+        if (IsFailing) { Environment.Exit(-2); return; }
+        IsFailing = true;
+        Log.Error(context, exception);
+        var report = Log.WriteCrashReport(exception, context);
+        if (!_unattendedCrashTest)
+            MessageBox.Show($"DrivePartitionTool must close because of an unexpected error. Any unfinished operations need to be reviewed before retrying.\n\n{exception.Message}\n\n" +
+                (report is null ? "The error report could not be saved." : "Error report: " + report), "DrivePartitionTool", MessageBoxButton.OK, MessageBoxImage.Error);
+        Shutdown(-1);
     }
 }
 

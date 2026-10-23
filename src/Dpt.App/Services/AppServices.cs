@@ -7,9 +7,10 @@ using Dpt.Shell.Operations;
 namespace Dpt.App.Services;
 
 /// <summary>Composition root: the app's long-lived services. Created once at startup.</summary>
-public sealed class AppServices
+public sealed class AppServices : IDisposable
 {
     private static AppServices? _current;
+    private int _disposed;
 
     private AppServices()
     {
@@ -33,11 +34,13 @@ public sealed class AppServices
         FolderSizes.Catalog = Catalog;
         RuleRunner = new RuleService(this);
         Layouts = new LayoutService(this);
+        FolderAssociation = FolderAssociationService.CreateDefault();
     }
 
     public static AppServices Current => _current ?? throw new InvalidOperationException("Services not initialized.");
 
     public static AppServices Initialize() => _current ??= new AppServices();
+    public static void Shutdown() => _current?.Dispose();
 
     public AppDatabase Database { get; }
     public SettingsStore SettingsStore { get; }
@@ -56,6 +59,7 @@ public sealed class AppServices
     public DriveService Drives { get; }
     public ThemeService Theme { get; }
     public AddressResolver Addresses { get; }
+    public FolderAssociationService FolderAssociation { get; }
 
     /// <summary>Main window handle, used as the owner for shell dialogs.</summary>
     public IntPtr OwnerWindow { get; set; }
@@ -67,5 +71,14 @@ public sealed class AppServices
         Settings = settings;
         SettingsStore.Save(settings);
         SettingsChanged?.Invoke(this, settings);
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        Activity.StopAcceptingWork();
+        foreach (var stop in new Action[] { RuleRunner.Dispose, Catalog.Dispose, Theme.Dispose })
+            try { stop(); } catch (Exception ex) { Diagnostics.Log.Error("Shutdown", ex); }
+        GC.SuppressFinalize(this);
     }
 }

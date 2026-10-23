@@ -26,7 +26,7 @@ public sealed partial class BootHealthViewModel : ObservableObject, IDisposable
     {
         _read = read ?? BootHealthService.ReadAsync;
         _allowSystem = allowSystem ?? AppServices.Current.Settings.AllowSystemPartitions;
-        _virtualOnly = virtualOnly ?? DiskWorkerLauncher.IsDevelopmentBuild;
+        _virtualOnly = virtualOnly ?? DiskWorkerLauncher.VirtualOnly;
         Recompute();
     }
 

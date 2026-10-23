@@ -116,8 +116,9 @@ public static class ServiceInstaller
             Directory.CreateDirectory(ProgramData);
             File.AppendAllText(LogPath, $"{DateTime.Now:O} {line}{Environment.NewLine}");
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
         {
+            Diagnostics.Log.Info("Service installer", line);
         }
     }
 
@@ -156,7 +157,7 @@ public static class ServiceInstaller
             Sc($"config {ServiceName} binPath= \"\\\"{exe}\\\"\" start= delayed-auto");
         Sc($"description {ServiceName} \"{Description}\"");
         Sc($"failure {ServiceName} reset= 86400 actions= restart/60000/restart/60000/none/0");
-        Sc($"start {ServiceName}", allowFailure: true);
+        Sc($"start {ServiceName}");
         Log("Installed and started.");
     }
 
@@ -184,12 +185,13 @@ public static class ServiceInstaller
         }
         catch (System.ServiceProcess.TimeoutException)
         {
+            throw new InvalidOperationException("The catalog service did not stop in time. No program files were copied; retry after it stops.");
         }
     }
 
     private static void Sc(string args, bool allowFailure = false)
     {
-        using var p = Process.Start(new ProcessStartInfo("sc.exe", args) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true })!;
+        using var p = Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "sc.exe"), args) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true })!;
         var output = p.StandardOutput.ReadToEnd();
         p.WaitForExit();
         Log($"sc {args} → {p.ExitCode} {output.Trim()}");
@@ -197,22 +199,5 @@ public static class ServiceInstaller
     }
 
     private static void CopyDirectory(string from, string to)
-    {
-        foreach (var dir in Directory.EnumerateDirectories(from, "*", SearchOption.AllDirectories))
-            Directory.CreateDirectory(Path.Combine(to, Path.GetRelativePath(from, dir)));
-        Directory.CreateDirectory(to);
-        foreach (var file in Directory.EnumerateFiles(from, "*", SearchOption.AllDirectories))
-        {
-            var dest = Path.Combine(to, Path.GetRelativePath(from, file));
-            try
-            {
-                File.Copy(file, dest, overwrite: true);
-            }
-            catch (IOException) when (File.Exists(dest))
-            {
-                // In use (e.g. the installed app is open). Keep the existing copy.
-                Log($"Skipped in-use file {dest}");
-            }
-        }
-    }
+        => PackageFiles.CopyDirectory(from, to);
 }

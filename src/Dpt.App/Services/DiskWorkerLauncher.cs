@@ -33,6 +33,7 @@ public sealed class DiskWorkerLauncher(AppServices services)
 #endif
         }
     }
+    public static bool VirtualOnly => IsDevelopmentBuild || string.Equals(Environment.GetEnvironmentVariable("DPT_SAFETY"), "virtual-only", StringComparison.OrdinalIgnoreCase);
 
     public static string NewStatusFile(string id) => Path.Combine(Folder, id + ".status.jsonl");
 
@@ -41,7 +42,7 @@ public sealed class DiskWorkerLauncher(AppServices services)
         Directory.CreateDirectory(Folder);
         var planFile = Path.Combine(Folder, plan.Id + ".plan.json");
         await File.WriteAllTextAsync(planFile, JsonSerializer.Serialize(plan, PipeProtocol.Json));
-        var activity = services.Activity.Start(plan.Title);
+        var activity = services.Activity.Start(plan.Title, keepsAppRunning: true);
         var seen = new List<DiskProgress>();
         Process? process;
         try

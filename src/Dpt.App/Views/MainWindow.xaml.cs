@@ -40,21 +40,26 @@ public partial class MainWindow : Window
 
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
+        if (App.IsFailing) return;
         Vm?.SaveTabs();
         var s = AppServices.Current;
-        if (!_exitRequested && s.Settings.KeepRunningInTray && s.RuleRunner.HasAutomaticRules)
+        var busy = s.Activity.HasWorkInProgress;
+        if (busy || !_exitRequested && s.Settings.KeepRunningInTray && s.RuleRunner.HasAutomaticRules)
         {
             // Keep automatic rules working: hide to the notification area instead of exiting.
             e.Cancel = true;
             HideToTray();
             if (!_toldAboutTray)
             {
-                _tray?.Balloon("Still running", "Automatic rules keep working. Click the icon to open DrivePartitionTool, or right-click to exit.");
+                _tray?.Balloon("Still running", busy ? "File operations are still running. Open DrivePartitionTool from this icon to review or cancel them." : "Automatic rules keep working. Click the icon to open DrivePartitionTool, or right-click to exit.");
                 _toldAboutTray = true;
             }
 
             return;
         }
+
+        // Atomically refuse jobs that race with closing the last window.
+        if (!s.Activity.TryBeginShutdown()) { e.Cancel = true; return; }
 
         _tray?.Dispose();
     }
@@ -76,6 +81,13 @@ public partial class MainWindow : Window
 
     public void ExitApp()
     {
+        if (AppServices.Current.Activity.HasWorkInProgress)
+        {
+            RestoreFromTray();
+            if (Vm is not null) Vm.IsActivityOpen = true;
+            AppServices.Current.FileOps.Dialogs.ShowInfo("Operations are still running", "Wait for the file or disk operations to finish, or cancel them in the activity list, before exiting.");
+            return;
+        }
         _exitRequested = true;
         Close();
     }

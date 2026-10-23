@@ -5,8 +5,9 @@ using Microsoft.Win32;
 namespace Dpt.App.Services;
 
 /// <summary>Switches between the light and dark palettes (and the matching Fluent control theme).</summary>
-public sealed class ThemeService
+public sealed class ThemeService : IDisposable
 {
+    private UserPreferenceChangedEventHandler? _changed;
     private ResourceDictionary? _palette;
     private ThemePreference _preference = ThemePreference.System;
 
@@ -15,13 +16,16 @@ public sealed class ThemeService
     public void Initialize(ThemePreference preference)
     {
         _preference = preference;
-        SystemEvents.UserPreferenceChanged += (_, e) =>
+        _changed = (_, e) =>
         {
             if (e.Category == UserPreferenceCategory.General && _preference == ThemePreference.System)
-                Application.Current.Dispatcher.BeginInvoke(() => Apply(_preference));
+                if (Application.Current?.Dispatcher is { HasShutdownStarted: false } dispatcher) dispatcher.BeginInvoke(() => Apply(_preference));
         };
+        SystemEvents.UserPreferenceChanged += _changed;
         Apply(preference);
     }
+
+    public void Dispose() { if (_changed is not null) SystemEvents.UserPreferenceChanged -= _changed; _changed = null; }
 
     public void Apply(ThemePreference preference)
     {

@@ -102,13 +102,13 @@ public sealed class FileOperationsService(AppServices services)
             return null;
         }
 
-        var result = await services.Engine.RunAsync(new FileOperationRequest
+        var result = await RunWithActivityAsync(new FileOperationRequest
         {
             Kind = FileOperationKind.Rename,
             Sources = [path],
             NewName = newName,
             OwnerWindow = services.OwnerWindow,
-        });
+        }, $"Renaming {PathUtil.DisplayName(path)}");
         ReportFailures(result, "renamed");
         var done = result.Completed.FirstOrDefault();
         var newPath = done?.Destination ?? (File.Exists(target) || Directory.Exists(target) ? target : null);
@@ -129,8 +129,10 @@ public sealed class FileOperationsService(AppServices services)
     {
         var changes = renames.Where(r => !string.Equals(Path.GetFileName(r.Path), r.NewName, StringComparison.Ordinal)).ToList();
         if (changes.Count == 0) return 0;
-        var activity = services.Activity.Start(title);
-        var done = await RenameManyCoreAsync(changes, activity);
+        var activity = services.Activity.Start(title, keepsAppRunning: true);
+        List<(string From, string To)> done;
+        try { done = await RenameManyCoreAsync(changes, activity); }
+        catch { activity.Complete("Rename stopped", error: true); throw; }
         Journal(title, source, done.Select(d => (JournalKind.Rename, (string?)d.From, (string?)d.To, Directory.Exists(d.To))));
         activity.Complete($"Renamed {done.Count} of {changes.Count}", error: done.Count < changes.Count);
         if (done.Count < changes.Count) Dialogs.ShowError("Some items couldn't be renamed", $"{changes.Count - done.Count} item(s) kept their old names (in use or access denied).");
@@ -184,13 +186,13 @@ public sealed class FileOperationsService(AppServices services)
     public async Task<string?> NewFolderAsync(string folder, string? name = null)
     {
         name = FileOperationEngine.UniqueName(folder, name ?? "New folder", isFolder: true);
-        var result = await services.Engine.RunAsync(new FileOperationRequest
+        var result = await RunWithActivityAsync(new FileOperationRequest
         {
             Kind = FileOperationKind.NewFolder,
             DestinationFolder = folder,
             NewName = name,
             OwnerWindow = services.OwnerWindow,
-        });
+        }, $"Creating folder {name}");
         ReportFailures(result, "created");
         var created = result.Completed.FirstOrDefault()?.Destination ?? Path.Combine(folder, name);
         if (!Directory.Exists(created)) return null;
@@ -208,13 +210,13 @@ public sealed class FileOperationsService(AppServices services)
         }
 
         name = FileOperationEngine.UniqueName(folder, name, isFolder: false);
-        var result = await services.Engine.RunAsync(new FileOperationRequest
+        var result = await RunWithActivityAsync(new FileOperationRequest
         {
             Kind = FileOperationKind.NewFile,
             DestinationFolder = folder,
             NewName = name,
             OwnerWindow = services.OwnerWindow,
-        });
+        }, $"Creating file {name}");
         ReportFailures(result, "created");
         var created = result.Completed.FirstOrDefault()?.Destination ?? Path.Combine(folder, name);
         if (!File.Exists(created)) return null;
@@ -300,6 +302,13 @@ public sealed class FileOperationsService(AppServices services)
 
     /// <summary>Undoes the most recent batch (or a specific one). Returns a summary for the status line.</summary>
     public async Task<string?> UndoAsync(long? batchId = null)
+    {
+        var activity = services.Activity.Start("Undoing file operations", keepsAppRunning: true);
+        try { var result = await UndoCoreAsync(batchId); activity.Complete(result ?? "Nothing to undo"); return result; }
+        catch { activity.Complete("Undo stopped", error: true); throw; }
+    }
+
+    private async Task<string?> UndoCoreAsync(long? batchId)
     {
         var batch = batchId is { } id
             ? services.Journal.GetBatches(500).FirstOrDefault(b => b.Id == id)
@@ -401,7 +410,7 @@ public sealed class FileOperationsService(AppServices services)
     private async Task<FileOperationResult> RunWithActivityAsync(FileOperationRequest request, string title)
     {
         var control = new OperationControl();
-        var activity = services.Activity.Start(title, control.Cancel, paused => { if (paused) control.Pause(); else control.Resume(); });
+        var activity = services.Activity.Start(title, control.Cancel, paused => { if (paused) control.Pause(); else control.Resume(); }, keepsAppRunning: true);
         var progress = new Progress<FileOperationProgress>(p =>
         {
             activity.Progress = p.WorkTotal == 0 ? -1 : p.Fraction;

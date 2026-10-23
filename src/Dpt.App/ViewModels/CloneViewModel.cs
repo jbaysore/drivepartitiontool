@@ -92,7 +92,7 @@ public sealed partial class CloneViewModel : ObservableObject
         Problem = Source is null ? "Choose the drive to copy."
             : Destination is null ? "There is no other drive to copy to. Connect one first."
             : Destination.Disk.Size < needed ? "The destination is too small for the source's partitions."
-            : DiskWorkerLauncher.IsDevelopmentBuild && !(Source.Disk.IsVirtual && Destination.Disk.IsVirtual) ? "Development build: cloning works only between virtual disks."
+            : DiskWorkerLauncher.VirtualOnly && !(Source.Disk.IsVirtual && Destination.Disk.IsVirtual) ? "Development/test mode: cloning works only between virtual disks."
             : !string.Equals(Confirmation.Trim(), ExpectedConfirmation, StringComparison.OrdinalIgnoreCase) ? $"Type {ExpectedConfirmation} to confirm."
             : null;
         CanRun = Problem is null;

@@ -10,7 +10,7 @@ using Dpt.Shell;
 namespace Dpt.App.ViewModels;
 
 /// <summary>The window: tabs, navigation pane (pages, pins, drives), activity and undo.</summary>
-public sealed partial class MainViewModel : ObservableObject
+public sealed partial class MainViewModel : ObservableObject, IDisposable
 {
     public MainViewModel(IReadOnlyList<Location>? startLocations = null)
     {
@@ -207,5 +207,13 @@ public sealed partial class MainViewModel : ObservableObject
         catch (TaskCanceledException)
         {
         }
+    }
+
+    public void Dispose()
+    {
+        _toastCts?.Cancel();
+        foreach (var tab in Tabs.ToArray())
+            try { tab.Dispose(); } catch (Exception ex) { Diagnostics.Log.Error("Close tab", ex); }
+        GC.SuppressFinalize(this);
     }
 }

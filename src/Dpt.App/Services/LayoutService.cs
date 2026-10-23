@@ -55,7 +55,7 @@ public sealed class LayoutService(AppServices services)
         var moves = plan.Entries.Where(e => e.Outcome == LayoutOutcome.Move && e.Destination is not null).ToList();
         var journal = new List<(string Kind, string? Source, string? Dest, bool IsFolder)>();
         var failed = 0;
-        var activity = services.Activity.Start($"Applying layout \"{plan.Layout.Name}\"");
+        var activity = services.Activity.Start($"Applying layout \"{plan.Layout.Name}\"", keepsAppRunning: true);
         var groups = moves.GroupBy(e => Path.GetDirectoryName(e.Destination!)!, StringComparer.OrdinalIgnoreCase).ToList();
         var done = 0;
         foreach (var g in groups)

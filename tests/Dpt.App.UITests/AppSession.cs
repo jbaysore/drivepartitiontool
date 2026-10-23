@@ -15,6 +15,7 @@ namespace Dpt.App.UITests;
 public sealed class AppSession : IDisposable
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(15);
+    private readonly Process _process;
 
     public AppSession(string? startFolder = null, bool createSample = true, bool openFolder = true, string? arguments = null, Action<string>? prepare = null)
     {
@@ -34,21 +35,47 @@ public sealed class AppSession : IDisposable
         prepare?.Invoke(Browse);
         var psi = new ProcessStartInfo(ExePath, arguments ?? (openFolder ? $"\"{Browse}\"" : "")) { UseShellExecute = false };
         psi.Environment["DPT_DATA_DIR"] = DataDir;
+        psi.Environment["DPT_SAFETY"] = "virtual-only";
+        if (Environment.GetEnvironmentVariable("DPT_TEST_APP_EXE") is { Length: > 0 })
+        {
+            psi.Environment["DOTNET_ROOT"] = Path.Combine(Root, "no-external-runtime");
+            psi.Environment["DOTNET_MULTILEVEL_LOOKUP"] = "0";
+        }
         // Catalog only the test folder (never scan the owner's real drives from tests).
         psi.Environment["DPT_CATALOG_ROOTS"] = Browse;
-        App = Application.Launch(psi);
+        // Retain the process we started, including its exit handle; reopening by PID loses the exit code after shutdown.
+        _process = Process.Start(psi) ?? throw new InvalidOperationException("The test app did not start.");
+        App = Application.Attach(_process);
         Automation = new UIA3Automation();
         try
         {
-            Window = Retry.WhileNull(() => App.GetMainWindow(Automation, TimeSpan.FromSeconds(1)), TimeSpan.FromSeconds(30), throwOnTimeout: true).Result!;
-            WaitFor(() => Find("TabStrip"), TimeSpan.FromSeconds(30));
+            // Match the actual app window and its ready content, rather than retaining a transient startup window.
+            Window = Retry.WhileNull(() => App.GetAllTopLevelWindows(Automation)
+                .FirstOrDefault(w => w.AutomationId == "MainWindow" && w.FindFirstDescendant(Automation.ConditionFactory.ByAutomationId("TabStrip")) is not null),
+                TimeSpan.FromSeconds(30), TimeSpan.FromMilliseconds(150), throwOnTimeout: true, ignoreException: true).Result!;
+            if (Environment.GetEnvironmentVariable("DPT_TEST_APP_EXE") is { Length: > 0 })
+            {
+                using var process = Process.GetProcessById(App.ProcessId);
+                var runtime = process.Modules.Cast<ProcessModule>().Single(m => m.ModuleName.Equals("coreclr.dll", StringComparison.OrdinalIgnoreCase));
+                Assert.Equal(Path.Combine(Path.GetDirectoryName(ExePath)!, "coreclr.dll"), runtime.FileName, ignoreCase: true);
+            }
         }
-        catch
+        catch (Exception ex)
         {
+            var diagnostic = "";
+            try
+            {
+                var logs = Path.Combine(DataDir, "logs");
+                diagnostic = Directory.Exists(logs) ? string.Join("\n", Directory.EnumerateFiles(logs, "*.log").Select(File.ReadAllText)) : "No app log.";
+                diagnostic += "\nWindows: " + string.Join(" | ", App.GetAllTopLevelWindows(Automation).Select(w => w.Name + " (" + w.AutomationId + ")"));
+            }
+            catch (Exception) { }
             // Never leave a test copy of the app running (it would also hold the test runner's output pipe open).
             try { App.Kill(); } catch (Exception) { }
             Automation.Dispose();
-            throw;
+            App.Dispose();
+            _process.Dispose();
+            throw new InvalidOperationException($"The test app did not become ready. Data: {Root}\n{diagnostic}", ex);
         }
     }
 
@@ -63,6 +90,11 @@ public sealed class AppSession : IDisposable
     {
         get
         {
+            if (Environment.GetEnvironmentVariable("DPT_TEST_APP_EXE") is { Length: > 0 } package)
+            {
+                if (!Path.IsPathFullyQualified(package) || !File.Exists(package)) throw new InvalidOperationException("DPT_TEST_APP_EXE must name an existing, absolute packaged executable.");
+                return package;
+            }
             var dir = new DirectoryInfo(AppContext.BaseDirectory);
             while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "DrivePartitionTool.sln"))) dir = dir.Parent;
             if (dir is null) throw new InvalidOperationException("Repository root not found.");
@@ -157,22 +189,38 @@ public sealed class AppSession : IDisposable
 
     public void Dispose()
     {
+        Exception? closeError = null;
         try
         {
-            App.Close();
-            if (!App.HasExited) App.Kill();
+            if (!_process.HasExited)
+            {
+                WaitUntil(() => Window.Properties.ItemStatus.ValueOrDefault == "Ready", "file/disk jobs finish before the test app exits");
+                try { Window.Close(); }
+                catch (Exception) when (_process.HasExited && _process.ExitCode == 0) { }
+                if (!_process.WaitForExit(5000)) throw new TimeoutException("The test app did not exit after its file/disk jobs finished.");
+            }
+            if (_process.ExitCode != 0) throw new InvalidOperationException($"The test app exited with code {_process.ExitCode}.");
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // already gone
+            closeError = ex;
         }
-
-        Automation.Dispose();
-        App.Dispose();
-        if (Environment.GetEnvironmentVariable("DPT_KEEP_UI") == "1") return;
-        try { Directory.Delete(Root, true); }
-        catch (IOException) { }
-        catch (UnauthorizedAccessException) { }
+        finally
+        {
+            try { if (!_process.HasExited) App.Kill(); } catch (Exception) { }
+            Automation.Dispose(); App.Dispose(); _process.Dispose();
+            if (Environment.GetEnvironmentVariable("DPT_KEEP_UI") != "1")
+                try
+                {
+                    var parent = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "dpt-ui-tests")).TrimEnd('\\') + "\\";
+                    var resolved = Path.GetFullPath(Root);
+                    if (!resolved.StartsWith(parent, StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Test cleanup escaped its temporary directory.");
+                    Directory.Delete(resolved, true);
+                }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+        }
+        if (closeError is not null) throw new InvalidOperationException("The test app failed its shutdown check.", closeError);
     }
 }
 

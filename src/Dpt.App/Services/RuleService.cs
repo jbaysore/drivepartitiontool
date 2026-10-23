@@ -33,12 +33,15 @@ public sealed class RuleService : IDisposable
     private readonly ConcurrentDictionary<string, (long RuleId, DateTime Seen)> _pending = new(StringComparer.OrdinalIgnoreCase);
     private readonly Timer _settleTimer;
     private readonly SemaphoreSlim _runGate = new(1);
+    private readonly EventHandler _rulesChanged;
+    private volatile bool _disposed;
 
     public RuleService(AppServices services)
     {
         _services = services;
         _settleTimer = new Timer(_ => _ = ProcessPendingAsync(), null, Timeout.Infinite, Timeout.Infinite);
-        services.Rules.Changed += (_, _) => RefreshWatchers();
+        _rulesChanged = (_, _) => RefreshWatchers();
+        services.Rules.Changed += _rulesChanged;
     }
 
     public event EventHandler<string>? Notified;
@@ -100,7 +103,8 @@ public sealed class RuleService : IDisposable
         {
             var journal = new List<(string Kind, string? Source, string? Dest, bool IsFolder)>();
             int moved = 0, tagged = 0, skipped = 0, failed = 0;
-            var activity = _services.Activity.Start($"Rule: {rule.Definition.Name}");
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            var activity = _services.Activity.Start($"Rule: {rule.Definition.Name}", keepsAppRunning: true);
             var entries = plan.Entries.Where(e => e.Action.Note is null).ToList();
             for (var i = 0; i < entries.Count; i++)
             {
@@ -176,8 +180,10 @@ public sealed class RuleService : IDisposable
 
     public void RefreshWatchers()
     {
+        if (_disposed) return;
         lock (_watchers)
         {
+            if (_disposed) return;
             foreach (var list in _watchers.Values)
                 foreach (var w in list) w.Dispose();
             _watchers.Clear();
@@ -214,15 +220,17 @@ public sealed class RuleService : IDisposable
 
     private void Queue(string path, long ruleId)
     {
+        if (_disposed) return;
         var name = Path.GetFileName(path);
         if (name.StartsWith("~$", StringComparison.Ordinal) || TemporarySuffixes.Any(s => name.EndsWith(s, StringComparison.OrdinalIgnoreCase))) return;
         _pending[path] = (ruleId, DateTime.UtcNow);
-        _settleTimer.Change(1000, Timeout.Infinite);
+        SchedulePending();
     }
 
     /// <summary>Applies automatic rules to new items once they've stopped changing (e.g. a download finished).</summary>
     public async Task ProcessPendingAsync()
     {
+        if (_disposed) return;
         var now = DateTime.UtcNow;
         var ready = new List<(string Path, long RuleId)>();
         foreach (var (path, (ruleId, seen)) in _pending)
@@ -270,7 +278,14 @@ public sealed class RuleService : IDisposable
             }
         }
 
-        if (!_pending.IsEmpty) _settleTimer.Change(1000, Timeout.Infinite);
+        if (!_pending.IsEmpty) SchedulePending();
+    }
+
+    private void SchedulePending()
+    {
+        if (_disposed) return;
+        try { _settleTimer.Change(1000, Timeout.Infinite); }
+        catch (ObjectDisposedException) when (_disposed) { }
     }
 
     private static bool IsSettled(string path)
@@ -296,9 +311,13 @@ public sealed class RuleService : IDisposable
 
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
+        _services.Rules.Changed -= _rulesChanged;
         _settleTimer.Dispose();
         lock (_watchers)
             foreach (var list in _watchers.Values)
                 foreach (var w in list) w.Dispose();
+        _pending.Clear();
     }
 }

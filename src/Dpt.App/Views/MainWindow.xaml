@@ -9,7 +9,7 @@
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource DptWindow}" Foreground="{DynamicResource DptInk}"
         FontFamily="{StaticResource UiFont}" FontSize="13"
-        AutomationProperties.AutomationId="MainWindow">
+        AutomationProperties.AutomationId="MainWindow" AutomationProperties.ItemStatus="{Binding Activity.WorkStatus}">
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="38" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" />
     </WindowChrome.WindowChrome>

@@ -73,7 +73,7 @@ public sealed partial class DiskToolsPageViewModel : PageViewModel
     [ObservableProperty] private string _selectionTitle = "Choose a partition or unallocated space above.";
     [ObservableProperty] private string? _selectionNote;
 
-    public bool IsDevelopmentBuild => DiskWorkerLauncher.IsDevelopmentBuild;
+    public bool IsDevelopmentBuild => DiskWorkerLauncher.VirtualOnly;
     public string DevelopmentNote => Explanations.DevelopmentBuild;
     public string PartitionExplanation => Explanations.Partition;
 

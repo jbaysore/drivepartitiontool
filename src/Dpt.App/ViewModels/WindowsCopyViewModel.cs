@@ -51,7 +51,7 @@ public sealed partial class WindowsCopyViewModel : ObservableObject, IDisposable
     {
         Disks = disks;
         _scan = scan ?? WindowsCopyDiscovery.ScanAsync;
-        _virtualOnly = virtualOnly ?? DiskWorkerLauncher.IsDevelopmentBuild;
+        _virtualOnly = virtualOnly ?? DiskWorkerLauncher.VirtualOnly;
         Sources = disks.SelectMany(d => d.Partitions.Where(p => p.Root is not null && p.FileSystem == "NTFS").Select(p => new WindowsVolumeChoice(d, p))).ToList();
         _source = Sources.FirstOrDefault(s => s.Partition.Role == PartitionRole.Windows) ?? Sources.FirstOrDefault();
         _firmware = _source?.Disk.PartitionStyle == "MBR" ? BootFirmware.Bios : BootFirmware.Uefi;

@@ -7,8 +7,8 @@ Goal: `GOAL_NO_ADMIN.md`. This checklist tracks the whole goal; unchecked work r
 - [x] M9 Windows-copy options, preview, excluded-data copy, progress and results UI (view-model/temp-tree tests and read-only UI smoke test).
 - [x] M9 boot-health read-only inventory/BCD parsing, unavailable-data explanations and UI (fixed read-only service query, fixture/pipe/UI tests).
 - [x] M9 boot-repair preview and protected worker implementation, tested with fixtures/fakes (actual VHD repair/boot proof deferred).
-- [ ] M10 opt-in/reversible folder association, isolated-registry tests, no live association changed.
-- [ ] M10 taskbar and service install/upgrade guidance; logging/crash handling.
+- [x] M10 opt-in/reversible folder association, isolated-registry tests, no live association changed.
+- [x] M10 taskbar and service install/upgrade guidance; logging/crash handling.
 - [ ] M10 self-contained publish script, built and inspected local package.
 - [ ] Performance: actual cold-start (<1.5 s), 50k-folder (<300 ms), 1M-search (<100 ms) measurements and any limitations.
 - [ ] Everyday workflow review and meaningful non-admin regression/UI checks.
