@@ -13,8 +13,8 @@ Evidence that each milestone's exit criteria in `IMPLEMENTATION_PLAN.md` are met
 | M5 — Categories and rules | Done | see git log |
 | M6 — Folder-structure experiments | Done | see git log |
 | M7 — Disk worker + partitions | Done | see git log |
-| M8 — Whole-drive clone | Done (boot test deferred by the owner) | see git log |
-| M9 — Windows-only copy + boot repair | Not started | |
+| M8 — Whole-drive clone | Implemented with limitations; boot verification deferred by the owner | `19cad74` |
+| M9 — Windows-only copy + boot repair | In progress (partial engine + classifier; UI, boot health pending; elevated test not yet run) | see git log |
 | M10 — Integration and release | Not started | |
 
 ## Step 0 — Repo setup
@@ -120,3 +120,20 @@ Evidence that each milestone's exit criteria in `IMPLEMENTATION_PLAN.md` are met
 - Clone wizard: source/destination pickers with partition bars and contents, destination excludes the source and the running Windows disk, plain-language "everything on disk N is replaced" warning, size note, extend option, outcome text, typed `DISK N` confirmation, progress from the worker.
 - **Deviations:** (1) destinations smaller than the source's partition area are refused with an explanation instead of falling back to a file-by-file copy of the last partition; (2) the VirtualBox "boots to the login screen" proof is **deferred at the owner's request (2026-10-23)** — goal criterion 4 is open.
 - **Evidence (elevated, test VHDs):** `CloneTests.Clone_makes_an_identical_copy_and_uses_extra_space` — 600 MB system-like source (EFI FAT32 + MSR + NTFS with a 12 MB random file and 200 notes) cloned to a 1000 MB disk that held other data: same partition count/offsets/GPT types, new disk ID, EFI partition byte-identical, every file's SHA-256 identical, old destination data gone, label preserved, last partition grew by > 300 MB, source files and layout unchanged (3.5 min). `Clone_refuses_a_destination_that_is_too_small` (destination untouched), `Clone_requires_the_typed_disk_number`.
+
+## M9 — Windows-only copy and boot repair (in progress)
+
+- `WindowsContentClassifier` (Core): sorts a Windows drive into Windows itself (required: `\Windows`, boot files, system profiles, each user's `NTUSER*`), installed programs (`Program Files*`, `ProgramData`), per-user account settings (`AppData`), per-user personal folders, other top-level items, and always-excluded items (page/hibernation/swap files, `System Volume Information`, `$Recycle.Bin`, upgrade leftovers); neutral consequence text per group; exclusion list from the owner's choices. Unit tests pass (Core 90).
+- Partial `WindowsCopy` worker step (`WindowsCopyEngine`): implements fresh destination layout (UEFI: EFI 260 MB FAT32 + MSR + NTFS "Windows"; BIOS: one active NTFS partition), source Volume Shadow Copy exposure through a temporary directory link, DISM capture with exclusions into the destination, apply, and optional `bcdboot`. This path and its failure cleanup are not yet verified on VHDs; preservation of permissions, hard links, reparse points and streams remains to be demonstrated.
+- **Deviation:** no separate recovery partition is created on the copy.
+- **Not yet verified:** `WindowsCopyTests.Copies_windows_and_chosen_items_only_and_leaves_the_source_unchanged` is written (elevated, VHDs) but has not run — the owner can't approve admin prompts right now.
+- **Implementation audit still needed:** required `ProgramData\Microsoft` and profile content, custom program locations, exclusion validation, destination capacity checks and failure cleanup before the new UI exposes this worker. The current classifier allows omitting all `ProgramData` or `AppData`; it does not yet implement the plan's required subtrees.
+
+## Non-admin cleanup and handoff (2026-10-23)
+
+- Preserved the unfinished M9 implementation and its explicitly elevated VHD test. No elevated helper, disk mutation or boot command was executed during this cleanup.
+- The million-entry search test is tagged `Category=Perf` and runs after the other non-elevated tests, preserving its median-under-100-ms assertion. Both phases respect `-NoUi` and exclude elevated tests. `DPT_SAFETY=virtual-only` is now set for every build-script test run, including Release.
+- Added `build.ps1 -MaxCpuCount 1` for environments where parallel MSBuild workers fail. In this sandbox, parallel builds stopped with no compiler errors reported; a serial build succeeded with zero warnings/errors.
+- The reusable continuation prompt is `docs/GOAL_NO_ADMIN.md`. It covers M9 UI/boot-health implementation, M10 preparation and non-admin regression checks, while keeping elevated VHD tests, boot proofs, service installation and owner checks open.
+- **Verification:** `powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./build.ps1`, run outside the restricted sandbox with an explicit check that the shell was not Administrator: build succeeded with zero warnings/errors; **173 tests passed** (Core 90, Data 8, Shell 11, Index 24 + 1 isolated performance test, disk-worker protection/inventory 8, App 15, UI 16). The 1M-entry test retained its median-under-100-ms assertion. Full log: `.local/cleanup-final-tests.log` (local, ignored).
+- **Observed intermittent failure:** an earlier full run timed out in `Largest_items_lists_biggest_files_and_folders`. It subsequently passed alone (1 s) and in the complete rerun (2 s); no UI code or timeout assertion was changed. The initial sandbox attempt also could not connect to testhost; its identified processes were stopped before the unelevated rerun. Elevated and VirtualBox tests were not run.

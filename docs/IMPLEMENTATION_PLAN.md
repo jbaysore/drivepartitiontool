@@ -360,6 +360,7 @@ Each operation shows a before/after bar diagram, a plain-language "what will hap
 ## Verification (end-to-end)
 
 - `./build.ps1`: build plus all fast tests (Core, Data, Shell on temp dirs, App UI tests with FlaUI).
+- Timing-sensitive `Category=Perf` tests run separately after the other non-elevated tests. `-MaxCpuCount 1` limits MSBuild to one worker in environments where parallel workers fail; `-NoUi` skips UI automation when no interactive desktop is available.
 - `./build.ps1 -Elevated`, run in an admin shell: Index tests and DiskWorker integration tests, on VHDs only.
 - `tools/boot-test.ps1`: M8 and M9 boot checks in VirtualBox.
 - Manual smoke test per milestone:
@@ -367,3 +368,5 @@ Each operation shows a before/after bar diagram, a plain-language "what will hap
   - Browse with tabs, copy and paste a file to and from real File Explorer, and search for a partial name across drives.
   - Recycle a large file on a removable VHD and confirm the pause dialog appears.
   - Run a rule's preview, compare two layouts, and view the Drives panel against `Get-Disk` output.
+
+For the unattended continuation while the owner cannot approve administrator prompts, use `docs/GOAL_NO_ADMIN.md`. It defines completion of the non-admin phase and records the elevated/boot checks that remain necessary for V1.

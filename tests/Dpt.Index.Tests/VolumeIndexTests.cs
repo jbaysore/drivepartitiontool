@@ -169,8 +169,9 @@ public class SearchExecutorTests
         Assert.Equal(["Video"], SearchExecutor.ListFolder(vols, @"X:\Media").Select(i => i.Name));
     }
 
-    /// <summary>Plan target: first page of results from a 1M-file catalog in under 100 ms.</summary>
+    /// <summary>Plan target: first page of results from a 1M-file catalog in under 100 ms. Runs alone (Category=Perf) so timing is fair.</summary>
     [Fact]
+    [Trait("Category", "Perf")]
     public void One_million_entries_first_page_under_100ms()
     {
         var v = new VolumeIndex(@"Z:\", 9, "NTFS", "");
