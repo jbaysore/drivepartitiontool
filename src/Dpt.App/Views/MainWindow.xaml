@@ -36,6 +36,9 @@
         <DataTemplate DataType="{x:Type vm:RulesPageViewModel}">
             <v:RulesView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:LayoutsPageViewModel}">
+            <v:LayoutsView />
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:PlaceholderPageViewModel}">
             <v:PlaceholderView />
         </DataTemplate>

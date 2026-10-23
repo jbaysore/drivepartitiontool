@@ -11,7 +11,7 @@ Evidence that each milestone's exit criteria in `IMPLEMENTATION_PLAN.md` are met
 | M3 — Storage insight | Done (VHD comparison runs with the next elevated batch) | see git log |
 | M4 — Safe file-operation engine | Done (VHD Recycle-Bin-limit test runs with the next elevated batch) | see git log |
 | M5 — Categories and rules | Done | see git log |
-| M6 — Folder-structure experiments | Not started | |
+| M6 — Folder-structure experiments | Done | see git log |
 | M7 — Disk worker + partitions | Not started | |
 | M8 — Whole-drive clone | Not started | |
 | M9 — Windows-only copy + boot repair | Not started | |
@@ -92,3 +92,16 @@ Evidence that each milestone's exit criteria in `IMPLEMENTATION_PLAN.md` are met
   - `RuleEngineTests` (Core, 20 cases): folder scoping, every clause type, all/any/nested groups, destination templates, categories added only once, folder-into-itself guard. Core total 83 pass.
   - `RuleServiceTests` (App): preview lists the planned move and a moving rule refuses to run before preview; **new file arrives → automatic rule tags and moves it → Ctrl+Z restores it and removes the tag**; tags follow a rename and `cat:` resolves the new path; in-progress downloads ignored.
   - Screenshot of the Rules & categories page with two sample rules (since removed from the scratch database).
+
+## M6 — Folder-structure experiments
+
+- `Dpt.Core.Layouts`: a layout = folders to reorganize + target folder + ordered "these files go here" templates (type / extensions / name words → relative path with `{year}`, `{month}`, `{ext}`, `{type}`, `{category}` …) + fallback (or leave unmatched in place). `LayoutPlanner` produces every file's destination, a virtual folder tree with counts/sizes, and flags name clashes (between planned files or with files already there), files already in place and invalid patterns — no disk changes.
+- Folder layouts page: saved layouts, editor, **side-by-side preview of up to three layouts** (stats + expandable tree), "Apply this layout…" (re-plans, confirms counts, one undoable batch; optional removal of folders left empty), "Make rules for new files" (one automatic rule per template, still preview-gated), "Try layouts for this folder…" and "Largest items in this folder" from any folder.
+- Safety fixes found while building M6:
+  - **Engine: same-named items in one copy/move batch** (e.g. `a\photo.jpg` and `b\photo.jpg` → one folder) were queued under the same name, so the second could overwrite the first. Names claimed earlier in the batch now count as taken ("photo (2).jpg"). Regression test `Same_named_sources_in_one_batch_keep_both`.
+  - **Tags and reused file IDs:** a deleted file's ID can be reused by Windows for a new file; tags now store the file's creation time and stale matches are dropped (migration 4).
+  - Same-drive bulk moves (layouts and their undo) use a direct rename (`FastMove`, never overwrites) instead of per-item shell operations: 10k moves ≈ 23 s instead of ≈ 116 s.
+- **Evidence:**
+  - `LayoutPlannerTests` (Core): destinations/tree/counts, first-match-wins, unmatched left in place, clashes and already-in-place, layout → rules.
+  - `LayoutServiceTests.Ten_thousand_files_preview_matches_result_and_undo_restores` (App): 10,000 generated files in 185 folders, 28 name clashes; per-folder file counts after applying exactly equal the preview tree; source emptied; one Ctrl+Z restores every original path. Plan 2.9 s, apply 23 s, undo 24 s.
+  - Screenshot of the Folder layouts editor.

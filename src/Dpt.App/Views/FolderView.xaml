@@ -68,6 +68,8 @@
                         <Button.ContextMenu>
                             <ContextMenu>
                                 <MenuItem Header="Categories…" InputGestureText="Ctrl+K" Command="{Binding EditCategoriesCommand}" />
+                                <MenuItem Header="Try layouts for this folder…" Command="{Binding OrganizeCommand}" />
+                                <MenuItem Header="Largest items in this folder" Command="{Binding LargestHereCommand}" />
                                 <MenuItem Header="Duplicate here" InputGestureText="Ctrl+D" Command="{Binding DuplicateCommand}" />
                                 <MenuItem Header="Copy path" InputGestureText="Ctrl+Shift+C" Command="{Binding CopyPathCommand}" />
                                 <MenuItem Header="Properties" InputGestureText="Alt+Enter" Command="{Binding PropertiesCommand}" />

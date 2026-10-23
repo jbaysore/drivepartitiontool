@@ -102,6 +102,23 @@ public class FileOperationEngineTests
         Assert.Contains(b, r.Skipped);
     }
 
+    /// <summary>Regression: same-named files from different folders moved/copied together must never overwrite each other.</summary>
+    [Fact]
+    public async Task Same_named_sources_in_one_batch_keep_both()
+    {
+        using var t = new TempFolder();
+        var a = t.File(@"one\photo.jpg", "first");
+        var b = t.File(@"two\photo.jpg", "second");
+        var c = t.File(@"three\photo.jpg", "third");
+        var dest = t.Dir("dest");
+        var r = await _engine.RunAsync(new FileOperationRequest { Kind = FileOperationKind.Move, Sources = [a, b, c], DestinationFolder = dest });
+        Assert.True(r.Succeeded);
+        var contents = Directory.GetFiles(dest).Select(File.ReadAllText).Order().ToList();
+        Assert.Equal(["first", "second", "third"], contents);
+        Assert.Equal(3, r.Completed.Count);
+        Assert.Equal(3, r.Completed.Select(x => x.Destination).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+    }
+
     [Fact]
     public async Task Rename_new_folder_new_file()
     {

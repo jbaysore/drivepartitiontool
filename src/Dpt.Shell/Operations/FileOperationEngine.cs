@@ -26,12 +26,13 @@ public sealed class FileOperationEngine
     }
 
     /// <summary>"Name (2).ext", "Name (3).ext", … — the first name that does not exist in the folder.</summary>
-    public static string UniqueName(string folder, string name, bool isFolder)
+    public static string UniqueName(string folder, string name, bool isFolder, IReadOnlySet<string>? alsoTaken = null)
     {
         var stem = isFolder ? name : Path.GetFileNameWithoutExtension(name);
         var ext = isFolder ? "" : Path.GetExtension(name);
         var candidate = name;
-        for (var i = 2; File.Exists(Path.Combine(folder, candidate)) || Directory.Exists(Path.Combine(folder, candidate)); i++)
+        bool Taken(string n) => File.Exists(Path.Combine(folder, n)) || Directory.Exists(Path.Combine(folder, n)) || alsoTaken?.Contains(n) == true;
+        for (var i = 2; Taken(candidate); i++)
             candidate = $"{stem} ({i}){ext}";
         return candidate;
     }
@@ -176,9 +177,13 @@ public sealed class FileOperationEngine
             case FileOperationKind.Copy or FileOperationKind.Move:
             {
                 var dest = NativeMethods.CreateItem(r.DestinationFolder!);
+                // Names already claimed by earlier items in this same operation: two sources called "photo.jpg" from
+                // different folders must never land on one name (the second would overwrite the first).
+                var claimed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var s in sources)
                 {
                     var name = Path.GetFileName(s.TrimEnd('\\'));
+                    var isDir = Directory.Exists(s);
                     var target = Path.Combine(r.DestinationFolder!, name);
                     string? newName = null;
                     var sameLocation = string.Equals(Path.GetFullPath(s).TrimEnd('\\'), Path.GetFullPath(target).TrimEnd('\\'),
@@ -191,7 +196,12 @@ public sealed class FileOperationEngine
                             continue;
                         }
 
-                        newName = UniqueName(r.DestinationFolder!, CopyName(name, Directory.Exists(s)), Directory.Exists(s));
+                        newName = UniqueName(r.DestinationFolder!, CopyName(name, isDir), isDir, claimed);
+                    }
+                    else if (claimed.Contains(name))
+                    {
+                        // Clashes with another item in this batch: always keep both.
+                        newName = UniqueName(r.DestinationFolder!, name, isDir, claimed);
                     }
                     else if (File.Exists(target) || Directory.Exists(target))
                     {
@@ -202,9 +212,10 @@ public sealed class FileOperationEngine
                             continue;
                         }
 
-                        if (choice == ConflictChoice.KeepBoth) newName = UniqueName(r.DestinationFolder!, name, Directory.Exists(s));
+                        if (choice == ConflictChoice.KeepBoth) newName = UniqueName(r.DestinationFolder!, name, isDir, claimed);
                     }
 
+                    claimed.Add(newName ?? name);
                     var item = NativeMethods.CreateItem(s);
                     if (r.Kind == FileOperationKind.Copy) op.CopyItem(item, dest, newName, null);
                     else op.MoveItem(item, dest, newName, null);

@@ -1,0 +1,169 @@
+<UserControl x:Class="Dpt.App.Views.LayoutsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:Dpt.App.Controls"
+             xmlns:vm="clr-namespace:Dpt.App.ViewModels"
+             AutomationProperties.AutomationId="LayoutsView">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="24,20,24,24">
+            <TextBlock Text="Folder layouts" Style="{StaticResource PageTitle}" />
+            <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,16"
+                       Text="Try different ways of organizing a folder. Previews show the resulting folders without moving anything; compare up to three side by side, then apply one (undoable) or turn it into rules for new files." />
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="220" />
+                    <ColumnDefinition Width="20" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Saved layouts -->
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,8">
+                        <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="+ New" Command="{Binding NewCommand}" CommandParameter="{x:Null}" />
+                        <TextBlock Text="Saved layouts" Style="{StaticResource H2}" />
+                    </DockPanel>
+                    <ListBox ItemsSource="{Binding Layouts}" SelectedItem="{Binding Selected}" BorderThickness="0" Background="Transparent" AutomationProperties.AutomationId="LayoutList">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Definition.Name}" Padding="2,4" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
+
+                <!-- Editor -->
+                <Border Grid.Column="2" Style="{StaticResource Card}">
+                    <StackPanel>
+                        <DockPanel Margin="0,0,0,10">
+                            <TextBlock Text="Name" Width="120" VerticalAlignment="Center" />
+                            <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.AutomationId="LayoutName" />
+                        </DockPanel>
+                        <DockPanel>
+                            <TextBlock Text="Reorganize" Width="120" VerticalAlignment="Top" Margin="0,6,0,0" />
+                            <StackPanel>
+                                <ItemsControl ItemsSource="{Binding Sources}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <DockPanel Margin="0,2">
+                                                <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="Remove"
+                                                        Command="{Binding DataContext.RemoveSourceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                                                <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                    <Button Style="{StaticResource SecondaryButton}" Content="Add folder…" Click="OnAddSource" />
+                                    <CheckBox Content="Include subfolders" IsChecked="{Binding IncludeSubfolders}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                                </StackPanel>
+                            </StackPanel>
+                        </DockPanel>
+                        <DockPanel Margin="0,10,0,0">
+                            <TextBlock Text="New structure in" Width="120" VerticalAlignment="Center" />
+                            <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Browse…" Click="OnBrowseTarget" Margin="6,0,0,0" />
+                            <TextBox Text="{Binding TargetRoot, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.AutomationId="LayoutTarget" />
+                        </DockPanel>
+
+                        <TextBlock Text="Where files go (first matching line wins)" Style="{StaticResource H2}" Margin="0,16,0,6" />
+                        <ItemsControl ItemsSource="{Binding Templates}" AutomationProperties.AutomationId="LayoutTemplates">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,3">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="140" />
+                                            <ColumnDefinition Width="110" />
+                                            <ColumnDefinition Width="120" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox ItemsSource="{x:Static vm:TemplateRow.Types}" SelectedItem="{Binding Type}" DisplayMemberPath="Label" />
+                                        <TextBox Grid.Column="1" Margin="6,0,0,0" Text="{Binding Extensions, UpdateSourceTrigger=PropertyChanged}" ToolTip="Optional extensions, e.g. jpg, png" />
+                                        <TextBox Grid.Column="2" Margin="6,0,0,0" Text="{Binding NameContains, UpdateSourceTrigger=PropertyChanged}" ToolTip="Optional: name contains…" />
+                                        <TextBlock Grid.Column="3" Text="→" VerticalAlignment="Center" Margin="8,0" Foreground="{DynamicResource DptMuted}" />
+                                        <TextBox Grid.Column="4" Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}" ToolTip="Folder under the new structure, e.g. Media\Pictures\{year}" />
+                                        <StackPanel Grid.Column="5" Orientation="Horizontal" Margin="6,0,0,0">
+                                            <Button Style="{StaticResource IconButton}" ToolTip="Move up" Command="{Binding DataContext.MoveTemplateUpCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}">
+                                                <c:Icon Data="{StaticResource Icon.ArrowUp}" Size="13" />
+                                            </Button>
+                                            <Button Style="{StaticResource IconButton}" ToolTip="Remove" Command="{Binding DataContext.RemoveTemplateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}">
+                                                <c:Icon Data="{StaticResource Icon.X}" Size="13" />
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Style="{StaticResource Small}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                   Text="Type · optional extensions · optional words in the name → folder. Folder names can use {year}, {month}, {monthname}, {ext}, {type}, {category}." />
+                        <Button Style="{StaticResource LinkButton}" Content="+ Add line" Command="{Binding AddTemplateCommand}" HorizontalAlignment="Left" Margin="0,6,0,0" />
+                        <DockPanel Margin="0,10,0,0">
+                            <TextBlock Text="Everything else goes to" Width="160" VerticalAlignment="Center" />
+                            <TextBox Text="{Binding Fallback, UpdateSourceTrigger=PropertyChanged}" ToolTip="Leave empty to keep unmatched files where they are" Width="220" HorizontalAlignment="Left" />
+                            <TextBlock Text="(empty = leave them where they are)" Style="{StaticResource Small}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                        </DockPanel>
+                        <CheckBox Content="Remove folders that end up empty" IsChecked="{Binding RemoveEmptyFolders}" Margin="0,10,0,0" />
+
+                        <DockPanel Margin="0,16,0,0">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                <Button Style="{StaticResource DangerCommandButton}" Content="Delete" Command="{Binding DeleteCommand}" />
+                                <Button Style="{StaticResource SecondaryButton}" Content="Save a copy" Command="{Binding SaveAsCopyCommand}" Margin="6,0" />
+                                <Button Style="{StaticResource SecondaryButton}" Content="Save" Command="{Binding SaveCommand}" Margin="0,0,6,0" />
+                                <Button Style="{StaticResource PrimaryButton}" Content="Preview" Command="{Binding PreviewCommand}" AutomationProperties.AutomationId="LayoutPreviewButton" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding Message}" Foreground="{DynamicResource DptAmber}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                        </DockPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Side-by-side previews -->
+            <TextBlock Text="Previewing…" Style="{StaticResource Muted}" Margin="0,14,0,0" Visibility="{Binding IsPreviewing, Converter={StaticResource BoolToVisible}}" />
+            <ItemsControl ItemsSource="{Binding Previews}" Margin="0,16,0,0" AutomationProperties.AutomationId="LayoutPreviews">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Rows="1" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource Card}" Margin="0,0,12,0" AutomationProperties.Name="{Binding Name}">
+                            <DockPanel>
+                                <DockPanel DockPanel.Dock="Top">
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" ToolTip="Close preview"
+                                            Command="{Binding DataContext.ClosePreviewCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}">
+                                        <c:Icon Data="{StaticResource Icon.X}" Size="12" />
+                                    </Button>
+                                    <TextBlock Text="{Binding Name}" Style="{StaticResource H2}" />
+                                </DockPanel>
+                                <TextBlock DockPanel.Dock="Top" Text="{Binding Stats}" Style="{StaticResource Small}" TextWrapping="Wrap" Margin="0,4,0,8" AutomationProperties.AutomationId="LayoutStats" />
+                                <WrapPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+                                    <Button Style="{StaticResource AccentCommandButton}" Content="Apply this layout…" Command="{Binding DataContext.ApplyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                                    <Button Style="{StaticResource CommandButton}" Content="Make rules for new files" Command="{Binding DataContext.MakeRulesCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                                    <Button Style="{StaticResource CommandButton}" Content="Open folder" Command="{Binding DataContext.OpenTargetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                                </WrapPanel>
+                                <TreeView ItemsSource="{Binding Tree}" MaxHeight="420" BorderThickness="0" Background="Transparent">
+                                    <TreeView.ItemContainerStyle>
+                                        <Style TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
+                                            <Setter Property="IsExpanded" Value="True" />
+                                        </Style>
+                                    </TreeView.ItemContainerStyle>
+                                    <TreeView.ItemTemplate>
+                                        <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <c:Icon Data="{StaticResource Icon.Folder}" Size="14" Foreground="{DynamicResource DptMuted}" Margin="0,0,6,0" />
+                                                <TextBlock Text="{Binding Name}" />
+                                                <TextBlock Text="{Binding Detail}" Style="{StaticResource Small}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </HierarchicalDataTemplate>
+                                    </TreeView.ItemTemplate>
+                                </TreeView>
+                            </DockPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

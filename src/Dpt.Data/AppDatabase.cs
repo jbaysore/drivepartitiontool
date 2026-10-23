@@ -76,6 +76,10 @@ public sealed class AppDatabase
                             last_run TEXT);
         CREATE TABLE layouts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, definition TEXT NOT NULL);
         """,
+        // 4: creation time with each tag, so a reused file ID (deleted file, new file) isn't mistaken for the tagged item
+        """
+        ALTER TABLE item_tags ADD COLUMN created INTEGER NOT NULL DEFAULT 0;
+        """,
     ];
 
     private void Migrate()

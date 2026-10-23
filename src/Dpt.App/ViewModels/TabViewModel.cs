@@ -19,6 +19,7 @@ public static class PageFactory
         [LocationKind.Search] = (t, l) => new SearchPageViewModel(t, l),
         [LocationKind.Drives] = (t, _) => new DrivesPageViewModel(t),
         [LocationKind.Rules] = (t, _) => new RulesPageViewModel(t),
+        [LocationKind.Layouts] = (t, l) => new LayoutsPageViewModel(t, l),
         [LocationKind.LargestItems] = (t, l) => new LargestPageViewModel(t, l),
     };
 

@@ -5,7 +5,7 @@ namespace Dpt.Data;
 public sealed record Category(long Id, string Name, string Color, long? ParentId);
 
 /// <summary>A tagged item. <see cref="FileRef"/>/<see cref="VolumeSerial"/> are 0 when the file system has no stable IDs.</summary>
-public sealed record ItemTag(long Id, uint VolumeSerial, ulong FileRef, string Path, long CategoryId);
+public sealed record ItemTag(long Id, uint VolumeSerial, ulong FileRef, string Path, long CategoryId, long Created = 0);
 
 /// <summary>
 /// User categories and which items carry them. Tags are keyed by the file's volume serial + file ID so they follow
@@ -82,13 +82,14 @@ public sealed class CategoriesRepository(AppDatabase db)
     // ---------------- Tags ----------------
 
     /// <summary>Adds a tag. Returns false if the item already had it.</summary>
-    public bool Tag(string path, uint volumeSerial, ulong fileRef, long categoryId)
+    public bool Tag(string path, uint volumeSerial, ulong fileRef, long categoryId, long created = 0)
     {
-        if (HasTag(path, volumeSerial, fileRef, categoryId)) return false;
+        if (TagsFor(path, volumeSerial, fileRef, created).Any(t => t.CategoryId == categoryId)) return false;
         using (var c = db.Open())
         using (var cmd = c.CreateCommand())
         {
-            cmd.CommandText = "INSERT OR IGNORE INTO item_tags(volume_serial, file_ref, path, category_id) VALUES($s, $r, $p, $c)";
+            cmd.CommandText = "INSERT OR IGNORE INTO item_tags(volume_serial, file_ref, path, category_id, created) VALUES($s, $r, $p, $c, $t)";
+            cmd.Parameters.AddWithValue("$t", created);
             cmd.Parameters.AddWithValue("$s", (long)volumeSerial);
             cmd.Parameters.AddWithValue("$r", unchecked((long)fileRef));
             cmd.Parameters.AddWithValue("$p", path);
@@ -115,21 +116,30 @@ public sealed class CategoriesRepository(AppDatabase db)
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    private bool HasTag(string path, uint serial, ulong fileRef, long categoryId) =>
-        TagsFor(path, serial, fileRef).Any(t => t.CategoryId == categoryId);
-
     /// <summary>Tags for one item (by file ID when available, otherwise by path). Refreshes the stored path if it moved.</summary>
-    public IReadOnlyList<ItemTag> TagsFor(string path, uint volumeSerial, ulong fileRef)
+    public IReadOnlyList<ItemTag> TagsFor(string path, uint volumeSerial, ulong fileRef, long created = 0)
     {
         using var c = db.Open();
         using var cmd = c.CreateCommand();
         cmd.CommandText = fileRef != 0
-            ? "SELECT id, volume_serial, file_ref, path, category_id FROM item_tags WHERE volume_serial = $s AND file_ref = $r"
-            : "SELECT id, volume_serial, file_ref, path, category_id FROM item_tags WHERE file_ref = 0 AND path = $p";
+            ? "SELECT id, volume_serial, file_ref, path, category_id, created FROM item_tags WHERE volume_serial = $s AND file_ref = $r"
+            : "SELECT id, volume_serial, file_ref, path, category_id, created FROM item_tags WHERE file_ref = 0 AND path = $p";
         cmd.Parameters.AddWithValue("$s", (long)volumeSerial);
         cmd.Parameters.AddWithValue("$r", unchecked((long)fileRef));
         cmd.Parameters.AddWithValue("$p", path);
         var list = Read(cmd);
+        if (fileRef != 0 && created != 0 && list.Any(t => t.Created != 0 && t.Created != created))
+        {
+            // Same file ID but a different creation time: the tagged file was deleted and Windows reused its ID.
+            using var stale = c.CreateCommand();
+            stale.CommandText = "DELETE FROM item_tags WHERE volume_serial = $s AND file_ref = $r AND created <> 0 AND created <> $t";
+            stale.Parameters.AddWithValue("$s", (long)volumeSerial);
+            stale.Parameters.AddWithValue("$r", unchecked((long)fileRef));
+            stale.Parameters.AddWithValue("$t", created);
+            stale.ExecuteNonQuery();
+            list = list.Where(t => t.Created == 0 || t.Created == created).ToList();
+        }
+
         if (list.Any(t => !string.Equals(t.Path, path, StringComparison.OrdinalIgnoreCase)))
         {
             using var up = c.CreateCommand();
@@ -149,7 +159,7 @@ public sealed class CategoriesRepository(AppDatabase db)
     {
         using var c = db.Open();
         using var cmd = c.CreateCommand();
-        cmd.CommandText = "SELECT id, volume_serial, file_ref, path, category_id FROM item_tags WHERE category_id = $c";
+        cmd.CommandText = "SELECT id, volume_serial, file_ref, path, category_id, created FROM item_tags WHERE category_id = $c";
         cmd.Parameters.AddWithValue("$c", categoryId);
         return Read(cmd);
     }
@@ -184,7 +194,7 @@ public sealed class CategoriesRepository(AppDatabase db)
         using var r = cmd.ExecuteReader();
         var list = new List<ItemTag>();
         while (r.Read())
-            list.Add(new ItemTag(r.GetInt64(0), (uint)r.GetInt64(1), unchecked((ulong)r.GetInt64(2)), r.GetString(3), r.GetInt64(4)));
+            list.Add(new ItemTag(r.GetInt64(0), (uint)r.GetInt64(1), unchecked((ulong)r.GetInt64(2)), r.GetString(3), r.GetInt64(4), r.GetInt64(5)));
         return list;
     }
 }

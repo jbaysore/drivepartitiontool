@@ -521,6 +521,12 @@ public sealed partial class FolderPageViewModel : PageViewModel
     private void ToggleViewMode() => ViewMode = ViewMode == FolderViewMode.Details ? FolderViewMode.Thumbnails : FolderViewMode.Details;
 
     [RelayCommand]
+    private void Organize() => Tab.Navigate(new Location(LocationKind.Layouts, FolderPath));
+
+    [RelayCommand]
+    private void LargestHere() => Tab.Navigate(new Location(LocationKind.LargestItems, FolderPath));
+
+    [RelayCommand]
     private void OpenInExplorer() => ShellLauncher.RevealInExplorer(SelectedItems.FirstOrDefault()?.Path ?? FolderPath);
 
     [RelayCommand]

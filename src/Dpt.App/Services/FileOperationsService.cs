@@ -338,6 +338,15 @@ public sealed class FileOperationsService(AppServices services)
 
                         var originalFolder = Path.GetDirectoryName(e.SourcePath)!;
                         Directory.CreateDirectory(originalFolder);
+                        if (e.Kind == JournalKind.Move && FastMove.SameVolume(e.DestPath, e.SourcePath) && FastMove.MoveTo(e.DestPath, e.SourcePath))
+                        {
+                            // Same drive: put it back directly (fast for big batches like layouts).
+                            services.Categories.OnMoved(e.DestPath, e.SourcePath);
+                            folders.Add(originalFolder);
+                            folders.Add(Path.GetDirectoryName(e.DestPath)!);
+                            break;
+                        }
+
                         var r = await services.Engine.RunAsync(e.Kind == JournalKind.Rename
                             ? new FileOperationRequest { Kind = FileOperationKind.Rename, Sources = [e.DestPath], NewName = Path.GetFileName(e.SourcePath), OwnerWindow = services.OwnerWindow }
                             : new FileOperationRequest

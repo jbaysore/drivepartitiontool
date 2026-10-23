@@ -5,7 +5,7 @@ using Microsoft.Win32.SafeHandles;
 namespace Dpt.Shell.FileSystem;
 
 /// <summary>A file's stable identity on its volume (survives renames and moves within the volume).</summary>
-public readonly record struct FileId(uint VolumeSerial, ulong FileIndex);
+public readonly record struct FileId(uint VolumeSerial, ulong FileIndex, long CreatedTicks = 0);
 
 /// <summary>Gets a file's ID from its path, and finds its current path from the ID (no admin rights needed).</summary>
 public static class FileIdentity
@@ -54,7 +54,7 @@ public static class FileIdentity
     {
         using var h = CreateFile(path, FILE_READ_ATTRIBUTES, SHARE_ALL, IntPtr.Zero, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, IntPtr.Zero);
         if (h.IsInvalid || !GetFileInformationByHandle(h, out var info)) return null;
-        return new FileId(info.VolumeSerialNumber, ((ulong)info.FileIndexHigh << 32) | info.FileIndexLow);
+        return new FileId(info.VolumeSerialNumber, ((ulong)info.FileIndexHigh << 32) | info.FileIndexLow, info.CreationTime);
     }
 
     /// <summary>Current full path of a file ID, or null if it no longer exists (or the volume isn't mounted).</summary>

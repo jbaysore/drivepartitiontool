@@ -14,15 +14,16 @@ public sealed class CategoryService(CategoriesRepository repo, JournalRepository
 
     public event EventHandler? Changed;
 
-    private static (uint Serial, ulong Ref) Id(string path) => FileIdentity.TryGet(path) is { } id ? (id.VolumeSerial, id.FileIndex) : (0u, 0UL);
+    private static (uint Serial, ulong Ref, long Created) Id(string path) =>
+        FileIdentity.TryGet(path) is { } id ? (id.VolumeSerial, id.FileIndex, id.CreatedTicks) : (0u, 0UL, 0L);
 
     /// <summary>Category names on an item (cached briefly for list views).</summary>
     public IReadOnlyList<string> CategoriesOf(string path)
     {
         if (_cache.TryGetValue(path, out var cached)) return cached;
-        var (serial, fileRef) = Id(path);
+        var (serial, fileRef, created) = Id(path);
         var cats = repo.GetCategories().ToDictionary(c => c.Id);
-        var names = repo.TagsFor(path, serial, fileRef).Select(t => cats.TryGetValue(t.CategoryId, out var c) ? c.Name : null)
+        var names = repo.TagsFor(path, serial, fileRef, created).Select(t => cats.TryGetValue(t.CategoryId, out var c) ? c.Name : null)
             .Where(n => n is not null).Cast<string>().OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
         _cache[path] = names;
         return names;
@@ -35,9 +36,9 @@ public sealed class CategoryService(CategoriesRepository repo, JournalRepository
         var categories = categoryNames.Select(n => repo.GetOrCreate(n)).ToList();
         foreach (var p in paths)
         {
-            var (serial, fileRef) = Id(p);
+            var (serial, fileRef, created) = Id(p);
             foreach (var c in categories)
-                if (repo.Tag(p, serial, fileRef, c.Id)) added.Add((p, c.Id));
+                if (repo.Tag(p, serial, fileRef, c.Id, created)) added.Add((p, c.Id));
             _cache.TryRemove(p, out _);
         }
 
@@ -52,7 +53,7 @@ public sealed class CategoryService(CategoriesRepository repo, JournalRepository
         if (repo.Find(categoryName) is not { } c) return;
         foreach (var p in paths)
         {
-            var (serial, fileRef) = Id(p);
+            var (serial, fileRef, _) = Id(p);
             repo.Untag(p, serial, fileRef, c.Id);
             _cache.TryRemove(p, out _);
         }
@@ -62,7 +63,7 @@ public sealed class CategoryService(CategoriesRepository repo, JournalRepository
 
     public void UntagById(string path, long categoryId)
     {
-        var (serial, fileRef) = Id(path);
+        var (serial, fileRef, _) = Id(path);
         repo.Untag(path, serial, fileRef, categoryId);
         _cache.TryRemove(path, out _);
         Changed?.Invoke(this, EventArgs.Empty);
@@ -81,7 +82,8 @@ public sealed class CategoryService(CategoriesRepository repo, JournalRepository
                 continue;
             }
 
-            if (t.FileRef != 0 && FileIdentity.TryResolve(new FileId(t.VolumeSerial, t.FileRef)) is { } moved)
+            if (t.FileRef != 0 && FileIdentity.TryResolve(new FileId(t.VolumeSerial, t.FileRef)) is { } moved &&
+                (t.Created == 0 || FileIdentity.TryGet(moved)?.CreatedTicks == t.Created))
             {
                 repo.UpdatePath(t.Id, moved);
                 list.Add(moved);

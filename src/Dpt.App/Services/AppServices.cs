@@ -32,6 +32,7 @@ public sealed class AppServices
         Catalog = new CatalogService(this);
         FolderSizes.Catalog = Catalog;
         RuleRunner = new RuleService(this);
+        Layouts = new LayoutService(this);
     }
 
     public static AppServices Current => _current ?? throw new InvalidOperationException("Services not initialized.");
@@ -46,6 +47,7 @@ public sealed class AppServices
     public RulesRepository Rules { get; }
     public CategoryService Categories { get; }
     public RuleService RuleRunner { get; }
+    public LayoutService Layouts { get; }
     public FileOperationEngine Engine { get; }
     public FileOperationsService FileOps { get; }
     public CatalogService Catalog { get; }
