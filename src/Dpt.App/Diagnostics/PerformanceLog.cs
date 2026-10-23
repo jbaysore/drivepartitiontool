@@ -13,13 +13,13 @@ internal static class PerformanceLog
     {
         if (!Enabled) return;
         using var process = Process.GetCurrentProcess();
-        Write(new { kind = "startup", milliseconds = (DateTime.UtcNow - process.StartTime.ToUniversalTime()).TotalMilliseconds });
+        Write(new { kind = "startup", milliseconds = (DateTime.UtcNow - process.StartTime.ToUniversalTime()).TotalMilliseconds, active = System.Windows.Application.Current.MainWindow?.IsActive });
     }
 
     public static void Folder(long started, double enumerationMs, double applicationMs, string path, int count)
     {
         if (!Enabled) return;
-        Write(new { kind = "folder", milliseconds = Stopwatch.GetElapsedTime(started).TotalMilliseconds, enumerationMs, applicationMs, path, count });
+        Write(new { kind = "folder", milliseconds = Stopwatch.GetElapsedTime(started).TotalMilliseconds, enumerationMs, applicationMs, path, count, active = System.Windows.Application.Current.MainWindow?.IsActive });
     }
 
     private static void Write(object entry)

@@ -54,12 +54,15 @@ public class PerformanceTests(ITestOutputHelper output)
             {
                 using var session = new AppSession(startFolder: root, createSample: false, openFolder: false, measurePerformance: true);
                 session.WaitUntil(() => Timing(session, "startup") is not null, "Home first render before folder navigation");
+                // Measure interactive navigation, with the same foreground guard as normal UI workflows.
+                session.EnsureForeground();
                 session.Get("EditAddressButton").AsButton().Invoke();
                 session.Get("AddressBox").AsTextBox().Text = root;
                 session.Get("GoToAddressButton").AsButton().Invoke();
                 session.WaitUntil(() => Timing(session, "folder") is not null, "complete 50k folder timing");
                 var timing = Timing(session, "folder")!.Value;
                 Assert.Equal(50_000, timing.GetProperty("count").GetInt32());
+                Assert.True(timing.GetProperty("active").GetBoolean(), "Folder timings require the app to remain the active window.");
                 var time = timing.GetProperty("milliseconds").GetDouble(); times.Add(time);
                 output.WriteLine($"50k run {i + 1}: total={time:F1} ms, enumeration={timing.GetProperty("enumerationMs").GetDouble():F1}, application={timing.GetProperty("applicationMs").GetDouble():F1}");
                 Assert.NotNull(session.Row("document0.txt"));
