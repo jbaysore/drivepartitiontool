@@ -10,7 +10,7 @@ Initial navigation baseline: **396.9, 334.3, 360.7, 358.4, 353.6 ms**, all over 
 
 After increasing enumeration buffers to 64 KiB and caching culture-aware numeric name sort keys, the same full navigation measurement was **289.5, 269.7, 281.9, 269.7, 264.3 ms**, all under target. Fresh-process startup in that run was **801.8, 614.2, 602.5, 608.4, 606.5 ms**, all under target (`.local/performance-sortkeys.log`). Sort-key tests cover multiple numeric runs, long numeric strings, accented names and invalidation after rename. Numeric collation uses the current .NET culture; exact punctuation/tie ordering can differ from Shell's undocumented `StrCmpLogicalW` ordering. No numeric parsing overflow or ASCII-only ordering is introduced. See [.NET sort keys](https://learn.microsoft.com/en-us/dotnet/api/system.globalization.compareinfo.getsortkey?view=net-10.0).
 
-Reproduce from a normal, interactive PowerShell:
+Reproduce from the source checkout in a normal, interactive PowerShell:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./build.ps1

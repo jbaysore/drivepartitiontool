@@ -1,6 +1,6 @@
 # Deferred administrator and owner verification
 
-This is follow-up work, not evidence of passed tests. The non-admin goal did not request UAC, install/remove services, attach/detach VHDs, execute mutating disk plans, capture/apply images or run boot tools. M8/M9 bootability and V1 release acceptance remain open.
+This is follow-up work, not evidence of passed tests. Run repository test commands below from the source checkout, not the portable package folder. The non-admin goal did not request UAC, install/remove services, attach/detach VHDs, execute mutating disk plans, capture/apply images or run boot tools. M8/M9 bootability and V1 release acceptance remain open.
 
 ## Disposable VHD tests (owner present, Administrator PowerShell)
 

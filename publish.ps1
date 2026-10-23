@@ -43,6 +43,9 @@ Publish-Project 'src\Dpt.App\Dpt.App.csproj' $stage
 Publish-Project 'src\Dpt.IndexService\Dpt.IndexService.csproj' (Join-Path $stage 'service')
 Publish-Project 'src\Dpt.DiskWorker\Dpt.DiskWorker.csproj' (Join-Path $stage 'diskworker')
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'docs\INSTALL_AND_VERIFY.md') -Destination (Join-Path $stage 'README.md')
+foreach ($guide in @('PERFORMANCE.md', 'OWNER_VERIFICATION.md')) {
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot ('docs\' + $guide)) -Destination (Join-Path $stage $guide)
+}
 $commit = (git rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0) { throw 'Could not identify the source commit.' }
 $dirty = [bool](git status --porcelain)
