@@ -92,7 +92,7 @@ public sealed class PlanRunner(DiskPlan plan, StatusWriter status, bool virtualO
             if (source is null) return Refuse(DiskWorkerExit.RefusedFingerprint, "The source disk is no longer connected. Nothing was changed.");
             if (virtualOnly && !source.IsVirtual) return Refuse(DiskWorkerExit.RefusedSafety, "Refused: the source is not a virtual disk, and this build only uses virtual disks.");
             if (Fingerprint.Mismatch(src, source) is { } why) return Refuse(DiskWorkerExit.RefusedFingerprint, "Source disk: " + why + " Nothing was changed.");
-            if (source.Number == target.Number) return Refuse(DiskWorkerExit.RefusedProtected, "The source and destination are the same disk.");
+            if (source.Number == target.Number && !IsBootRepairOnly(plan)) return Refuse(DiskWorkerExit.RefusedProtected, "The source and destination are the same disk.");
         }
 
         // 3. The disk is exactly the one (and layout) the owner previewed.
@@ -167,6 +167,9 @@ public sealed class PlanRunner(DiskPlan plan, StatusWriter status, bool virtualO
         status.Write(DiskProgressState.Succeeded, "Done.", 1);
         return DiskWorkerExit.Ok;
     }
+
+    /// <summary>Only a single boot-file repair may read Windows and write boot files on the same disk.</summary>
+    public static bool IsBootRepairOnly(DiskPlan value) => value.Steps.Count == 1 && value.Steps[0].Kind == DiskStepKind.RebuildBootFiles;
 
     /// <summary>Pure check (no disk access): why the plan touches something it must not, or null.</summary>
     public static string? CheckProtection(DiskPlan plan, DiskInfo target)

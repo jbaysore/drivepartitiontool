@@ -36,4 +36,5 @@ using (var id = WindowsIdentity.GetCurrent())
 
 Dpt.DiskWorker.Clone.CloneEngine.Register();
 Dpt.DiskWorker.Windows.WindowsCopyEngine.Register();
+Dpt.DiskWorker.Windows.BootRepairEngine.Register();
 return new PlanRunner(plan, status, SafetyMode.Current).Run();

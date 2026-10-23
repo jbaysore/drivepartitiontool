@@ -31,5 +31,6 @@ public class WindowsCopyViewTests
         if (Environment.GetEnvironmentVariable("DPT_UI_SCREENSHOT") is { Length: > 0 } screenshot)
             FlaUI.Core.Capturing.Capture.Element(dialog).ToFile(screenshot);
         dialog.Close();
+        session.WaitUntil(() => session.Window.IsEnabled, "owner re-enabled after closing the Windows-copy preview");
     }
 }

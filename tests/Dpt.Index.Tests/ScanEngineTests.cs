@@ -129,6 +129,30 @@ public sealed class ScanEngineTests : IDisposable
         Assert.Equal(1, (await again.SearchAsync(new SearchRequest { Query = "beach", IncludeHidden = true })).Total);
     }
 
+    [Fact]
+    public async Task Boot_metadata_pipe_accepts_no_paths_commands_or_mutating_methods()
+    {
+        var name = "dpt-boot-test-" + Guid.NewGuid().ToString("N");
+        using var me = WindowsIdentity.GetCurrent();
+        var calls = 0;
+        using var server = new CatalogPipeServer(_engine, [me.User!], name)
+        {
+            ReadBootConfiguration = _ => { calls++; return Task.FromResult(new BootConfigurationInfo(true, "fixture BCD", null)); },
+        };
+        server.Start(2);
+        using var client = new CatalogPipeClient(name);
+        Assert.Equal("fixture BCD", (await client.GetBootConfigurationAsync()).Output);
+        await using var pipe = new System.IO.Pipes.NamedPipeClientStream(".", name, System.IO.Pipes.PipeDirection.InOut, System.IO.Pipes.PipeOptions.Asynchronous);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await pipe.ConnectAsync(timeout.Token);
+        var payload = System.Text.Json.JsonSerializer.SerializeToElement(new { path = @"C:\", command = "format" });
+        await PipeProtocol.WriteAsync(pipe, new PipeRequest(CatalogMethods.BootConfiguration, payload), timeout.Token);
+        Assert.False((await PipeProtocol.ReadAsync<PipeResponse>(pipe, timeout.Token))!.Ok);
+        await PipeProtocol.WriteAsync(pipe, new PipeRequest("formatVolume", payload), timeout.Token);
+        Assert.False((await PipeProtocol.ReadAsync<PipeResponse>(pipe, timeout.Token))!.Ok);
+        Assert.Equal(1, calls);
+    }
+
     public void Dispose()
     {
         _engine.Dispose();

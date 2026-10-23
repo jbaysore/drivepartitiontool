@@ -46,7 +46,7 @@ public sealed class CatalogHost(ILogger<CatalogHost> log) : BackgroundService
             IsService = true,
         });
         _engine.Start();
-        _server = new CatalogPipeServer(_engine, owners) { OnError = ex => log.LogWarning(ex, "pipe") };
+        _server = new CatalogPipeServer(_engine, owners) { OnError = ex => log.LogWarning(ex, "pipe"), ReadBootConfiguration = Dpt.Storage.BootConfigurationReader.ReadAsync };
         _server.Start();
         log.LogInformation("Catalog service started (MFT mode: {Mft}); {Count} owner account(s) allowed.", IsElevated(), owners.Count);
 

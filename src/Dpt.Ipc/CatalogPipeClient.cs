@@ -40,6 +40,7 @@ public sealed class CatalogPipeClient(string pipeName = PipeProtocol.CatalogPipe
     }
 
     public Task<CatalogStatus> GetStatusAsync(CancellationToken ct = default) => Call<CatalogStatus>(CatalogMethods.Status, null, ct);
+    public Task<BootConfigurationInfo> GetBootConfigurationAsync(CancellationToken ct = default) => Call<BootConfigurationInfo>(CatalogMethods.BootConfiguration, null, ct);
 
     public Task<SearchResponse> SearchAsync(SearchRequest request, CancellationToken ct = default) => Call<SearchResponse>(CatalogMethods.Search, request, ct);
 

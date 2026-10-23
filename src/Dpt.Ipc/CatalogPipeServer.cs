@@ -15,6 +15,7 @@ public sealed class CatalogPipeServer(ICatalog catalog, IReadOnlyList<SecurityId
     private readonly List<Task> _listeners = [];
 
     public Action<Exception>? OnError { get; set; }
+    public Func<CancellationToken, Task<BootConfigurationInfo>>? ReadBootConfiguration { get; set; }
 
     public static PipeSecurity BuildSecurity(IEnumerable<SecurityIdentifier> allowed)
     {
@@ -122,6 +123,9 @@ public sealed class CatalogPipeServer(ICatalog catalog, IReadOnlyList<SecurityId
                 return null;
             case CatalogMethods.DiskHealth:
                 return E(await catalog.GetDiskHealthAsync(P<List<int>>().Take(64).ToList(), ct));
+            case CatalogMethods.BootConfiguration:
+                if (r.Payload is not null) throw new InvalidDataException("Boot configuration takes no paths or commands.");
+                return E(ReadBootConfiguration is { } read ? await read(ct) : new BootConfigurationInfo(false, "", "This service version does not provide boot configuration."));
             default:
                 throw new InvalidDataException($"Unknown method '{r.Method}'.");
         }

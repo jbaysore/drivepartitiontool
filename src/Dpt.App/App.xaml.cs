@@ -43,6 +43,7 @@ public partial class App : Application
         DiskToolsPageViewModel.ShowAction = PartitionActionWindow.ShowAsync;
         DiskToolsPageViewModel.ShowClone = CloneWindow.ShowAsync;
         DiskToolsPageViewModel.ShowWindowsCopy = WindowsCopyWindow.ShowAsync;
+        DiskToolsPageViewModel.ShowBootHealth = BootHealthWindow.ShowAsync;
         RulesPageViewModel.PreviewRule = RulePreviewWindow.ShowAsync;
         SearchPageViewModel.CategoryResolver = services.Categories.ResolveForSearchAsync;
         services.RuleRunner.Start();

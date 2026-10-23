@@ -58,6 +58,7 @@ public sealed record PipeResponse(bool Ok, string? Error, JsonElement? Payload);
 
 public static class CatalogMethods
 {
+    public const string BootConfiguration = "bootConfiguration";
     public const string Status = "status";
     public const string Search = "search";
     public const string FolderSizes = "folderSizes";
