@@ -11,6 +11,9 @@ public static class JournalKind
 
     /// <summary>Source = original path, Dest = the item's path inside the Recycle Bin ($R…).</summary>
     public const string Recycle = "recycle";
+
+    /// <summary>Source = item path, Dest = category id. Undo removes the tag.</summary>
+    public const string Tag = "tag";
 }
 
 public sealed record JournalBatch(long Id, DateTimeOffset Created, string Title, string Source, bool Undone);

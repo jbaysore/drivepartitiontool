@@ -55,6 +55,17 @@ public sealed partial class FileItemViewModel : ObservableObject
     partial void OnSizeChanged(long? value) => OnPropertyChanged(nameof(SizeText));
     partial void OnSizePendingChanged(bool value) => OnPropertyChanged(nameof(SizeText));
 
+    private string? _categoriesText;
+
+    /// <summary>Categories on this item, e.g. "Photos, Taxes" (looked up lazily for the optional Categories column).</summary>
+    public string CategoriesText => _categoriesText ??= string.Join(", ", Services.AppServices.Current.Categories.CategoriesOf(Entry.Path));
+
+    public void RefreshCategories()
+    {
+        _categoriesText = null;
+        OnPropertyChanged(nameof(CategoriesText));
+    }
+
     [ObservableProperty] private bool _isEditing;
     [ObservableProperty] private string _editName = "";
     [ObservableProperty] private bool _isCut;

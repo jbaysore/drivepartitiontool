@@ -18,6 +18,8 @@ public sealed class AppServices
         Settings = SettingsStore.Load();
         Locations = new LocationsRepository(Database);
         Journal = new JournalRepository(Database);
+        Rules = new RulesRepository(Database);
+        Categories = new CategoryService(new CategoriesRepository(Database), Journal);
         Engine = new FileOperationEngine();
         Activity = new ActivityHub();
         FolderSizes = new FolderSizeService();
@@ -29,6 +31,7 @@ public sealed class AppServices
         FileOps = new FileOperationsService(this);
         Catalog = new CatalogService(this);
         FolderSizes.Catalog = Catalog;
+        RuleRunner = new RuleService(this);
     }
 
     public static AppServices Current => _current ?? throw new InvalidOperationException("Services not initialized.");
@@ -40,6 +43,9 @@ public sealed class AppServices
     public AppSettings Settings { get; private set; }
     public LocationsRepository Locations { get; }
     public JournalRepository Journal { get; }
+    public RulesRepository Rules { get; }
+    public CategoryService Categories { get; }
+    public RuleService RuleRunner { get; }
     public FileOperationEngine Engine { get; }
     public FileOperationsService FileOps { get; }
     public CatalogService Catalog { get; }

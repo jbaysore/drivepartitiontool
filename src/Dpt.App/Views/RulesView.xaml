@@ -1,0 +1,106 @@
+<UserControl x:Class="Dpt.App.Views.RulesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:Dpt.App.Controls"
+             AutomationProperties.AutomationId="RulesView">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid Margin="26,24,26,27" MaxWidth="1150">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300" />
+                <ColumnDefinition Width="28" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Categories -->
+            <StackPanel>
+                <TextBlock Text="Categories" Style="{StaticResource PageTitle}" />
+                <TextBlock Text="Group items without moving them. An item can have several categories." Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,14" />
+                <Border Style="{StaticResource BarBorder}" Margin="0,0,0,10">
+                    <Grid>
+                        <TextBlock Text="New category…" Foreground="{DynamicResource DptMuted}" VerticalAlignment="Center" IsHitTestVisible="False"
+                                   Visibility="{Binding Text, ElementName=NewCat, Converter={StaticResource NullToVisible}}" />
+                        <TextBox x:Name="NewCat" Style="{StaticResource BareTextBox}" Text="{Binding NewCategory, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.AutomationId="NewCategoryBox">
+                            <TextBox.InputBindings>
+                                <KeyBinding Key="Enter" Command="{Binding AddCategoryCommand}" />
+                            </TextBox.InputBindings>
+                        </TextBox>
+                    </Grid>
+                </Border>
+                <TextBlock Text="No categories yet. Add one above, or tag items from a folder's “Categories…” command." Style="{StaticResource Small}" TextWrapping="Wrap"
+                           Visibility="{Binding HasCategories, Converter={StaticResource BoolToCollapsed}}" />
+                <ItemsControl ItemsSource="{Binding Categories}" AutomationProperties.AutomationId="CategoryList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Style="{StaticResource RowButton}" AutomationProperties.Name="{Binding Name}"
+                                    Command="{Binding DataContext.ShowCategoryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"
+                                    Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                <Button.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="Show items" Command="{Binding PlacementTarget.Tag.ShowCategoryCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="{Binding}" />
+                                        <MenuItem Header="Rename…" Command="{Binding PlacementTarget.Tag.RenameCategoryCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="{Binding}" />
+                                        <MenuItem Header="Delete…" Command="{Binding PlacementTarget.Tag.DeleteCategoryCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="{Binding}" />
+                                    </ContextMenu>
+                                </Button.ContextMenu>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Ellipse Width="10" Height="10" Fill="{Binding Color}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Name}" Margin="10,0" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="2" Text="{Binding CountText}" Style="{StaticResource Small}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                </Grid>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+            <!-- Rules -->
+            <StackPanel Grid.Column="2">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="New rule…" Command="{Binding AddRuleCommand}" VerticalAlignment="Top"
+                            AutomationProperties.AutomationId="NewRuleButton" />
+                    <StackPanel>
+                        <TextBlock Text="Rules" Style="{StaticResource PageTitle}" />
+                        <TextBlock Text="Rules tag and/or move matching items. Rules that move files always show you a preview first." Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,14" />
+                    </StackPanel>
+                </DockPanel>
+                <TextBlock Text="No rules yet. For example: “When a file in Downloads is a picture, tag it Photos and move it to Pictures\{year}”." Style="{StaticResource Small}" TextWrapping="Wrap"
+                           Visibility="{Binding HasRules, Converter={StaticResource BoolToCollapsed}}" />
+                <ItemsControl ItemsSource="{Binding Rules}" AutomationProperties.AutomationId="RuleList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource Card}" Margin="0,0,0,12" AutomationProperties.Name="{Binding Name}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <CheckBox IsChecked="{Binding Enabled}" VerticalAlignment="Top" Margin="0,2,10,0" ToolTip="On / off" AutomationProperties.Name="Enabled" />
+                                    <StackPanel Grid.Column="1">
+                                        <DockPanel>
+                                            <Border DockPanel.Dock="Right" Background="{DynamicResource DptAccentSoft}" CornerRadius="5" Padding="7,2">
+                                                <TextBlock Text="{Binding Badge}" FontSize="11" Foreground="{DynamicResource DptAccent}" />
+                                            </Border>
+                                            <TextBlock Text="{Binding Name}" Style="{StaticResource H2}" />
+                                        </DockPanel>
+                                        <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" Margin="0,6,0,4" />
+                                        <TextBlock Text="{Binding Status}" Style="{StaticResource Small}" />
+                                        <StackPanel Orientation="Horizontal" Margin="-8,8,0,0">
+                                            <Button Style="{StaticResource CommandButton}" Content="Preview…" Command="{Binding DataContext.PreviewCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                                            <Button Style="{StaticResource CommandButton}" Content="Run now" Command="{Binding DataContext.RunNowCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                                            <Button Style="{StaticResource CommandButton}" Content="Edit…" Command="{Binding DataContext.EditCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                                            <Button Style="{StaticResource DangerCommandButton}" Content="Delete" Command="{Binding DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

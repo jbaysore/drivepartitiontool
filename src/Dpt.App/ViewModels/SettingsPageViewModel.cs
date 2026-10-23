@@ -137,6 +137,9 @@ public sealed partial class SettingsPageViewModel : PageViewModel
         if (!item.TryApply(copy)) return;
         Services.SaveSettings(copy);
         if (item.Key == nameof(AppSettings.Theme)) Services.Theme.Apply(copy.Theme);
+        // Only touch the real sign-in entry when the owner flips this switch.
+        if (item.Key == nameof(AppSettings.StartAtSignIn)) SignInStartup.Apply(copy.StartAtSignIn);
+        if (item.Key == nameof(AppSettings.PauseAutomaticRules)) Services.RuleRunner.RefreshWatchers();
         StatusText = "Saved";
     }
 }

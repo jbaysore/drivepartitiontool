@@ -67,6 +67,7 @@
                         <c:Icon Data="{StaticResource Icon.MoreH}" Size="16" StrokeWidth="3" />
                         <Button.ContextMenu>
                             <ContextMenu>
+                                <MenuItem Header="Categories…" InputGestureText="Ctrl+K" Command="{Binding EditCategoriesCommand}" />
                                 <MenuItem Header="Duplicate here" InputGestureText="Ctrl+D" Command="{Binding DuplicateCommand}" />
                                 <MenuItem Header="Copy path" InputGestureText="Ctrl+Shift+C" Command="{Binding CopyPathCommand}" />
                                 <MenuItem Header="Properties" InputGestureText="Alt+Enter" Command="{Binding PropertiesCommand}" />
@@ -164,6 +165,7 @@
                         <GridViewColumn x:Name="NameColumn" Header="Name" Width="380" CellTemplate="{StaticResource NameCell}" />
                         <GridViewColumn x:Name="ModifiedColumn" Header="Date modified" Width="160" DisplayMemberBinding="{Binding ModifiedText}" />
                         <GridViewColumn x:Name="TypeColumn" Header="Type" Width="170" DisplayMemberBinding="{Binding TypeName}" />
+                        <GridViewColumn x:Name="CategoriesColumn" Header="Categories" Width="0" DisplayMemberBinding="{Binding CategoriesText}" />
                         <GridViewColumn x:Name="SizeColumn" Header="Size" Width="110">
                             <GridViewColumn.CellTemplate>
                                 <DataTemplate>

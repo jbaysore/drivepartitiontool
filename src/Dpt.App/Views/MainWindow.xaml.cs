@@ -28,7 +28,79 @@ public partial class MainWindow : Window
             if (e.ChangedButton == MouseButton.XButton1 && tab?.BackCommand.CanExecute(null) == true) tab.BackCommand.Execute(null);
             else if (e.ChangedButton == MouseButton.XButton2 && tab?.ForwardCommand.CanExecute(null) == true) tab.ForwardCommand.Execute(null);
         };
-        Closing += (_, _) => (DataContext as MainViewModel)?.SaveTabs();
+        Closing += OnClosing;
+    }
+
+    private Infrastructure.TrayIcon? _tray;
+    private bool _exitRequested;
+    private bool _toldAboutTray;
+
+    /// <summary>Started with --tray (sign-in): stay hidden in the notification area.</summary>
+    public bool StartInTray { get; set; }
+
+    private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        Vm?.SaveTabs();
+        var s = AppServices.Current;
+        if (!_exitRequested && s.Settings.KeepRunningInTray && s.RuleRunner.HasAutomaticRules)
+        {
+            // Keep automatic rules working: hide to the notification area instead of exiting.
+            e.Cancel = true;
+            HideToTray();
+            if (!_toldAboutTray)
+            {
+                _tray?.Balloon("Still running", "Automatic rules keep working. Click the icon to open DrivePartitionTool, or right-click to exit.");
+                _toldAboutTray = true;
+            }
+
+            return;
+        }
+
+        _tray?.Dispose();
+    }
+
+    public void HideToTray()
+    {
+        _tray ??= new Infrastructure.TrayIcon(new WindowInteropHelper(this).Handle);
+        _tray.Show("DrivePartitionTool — automatic rules running");
+        Hide();
+    }
+
+    public void RestoreFromTray()
+    {
+        Show();
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        Activate();
+        _tray?.Hide();
+    }
+
+    public void ExitApp()
+    {
+        _exitRequested = true;
+        Close();
+    }
+
+    private void ShowTrayMenu()
+    {
+        var menu = new ContextMenu();
+        var open = new MenuItem { Header = "Open DrivePartitionTool" };
+        open.Click += (_, _) => RestoreFromTray();
+        var pause = new MenuItem { Header = "Pause automatic rules", IsCheckable = true, IsChecked = AppServices.Current.Settings.PauseAutomaticRules };
+        pause.Click += (_, _) =>
+        {
+            var copy = AppServices.Current.Settings.Clone();
+            copy.PauseAutomaticRules = !copy.PauseAutomaticRules;
+            AppServices.Current.SaveSettings(copy);
+            AppServices.Current.RuleRunner.RefreshWatchers();
+        };
+        var exit = new MenuItem { Header = "Exit" };
+        exit.Click += (_, _) => ExitApp();
+        menu.Items.Add(open);
+        menu.Items.Add(pause);
+        menu.Items.Add(new Separator());
+        menu.Items.Add(exit);
+        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
+        menu.IsOpen = true;
     }
 
     private MainViewModel? Vm => DataContext as MainViewModel;
@@ -38,12 +110,21 @@ public partial class MainWindow : Window
         var hwnd = new WindowInteropHelper(this).Handle;
         AppServices.Current.OwnerWindow = hwnd;
         HwndSource.FromHwnd(hwnd)?.AddHook(WndProc);
+        if (StartInTray) Dispatcher.BeginInvoke(HideToTray, System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         if (msg == WM_DEVICECHANGE)
             Dispatcher.BeginInvoke(() => AppServices.Current.Drives.Refresh());
+        if (msg == Infrastructure.TrayIcon.CallbackMessage)
+        {
+            var mouse = (int)lParam & 0xFFFF;
+            if (mouse is Infrastructure.TrayIcon.WM_LBUTTONUP or Infrastructure.TrayIcon.WM_LBUTTONDBLCLK) Dispatcher.BeginInvoke(RestoreFromTray);
+            else if (mouse == Infrastructure.TrayIcon.WM_RBUTTONUP) Dispatcher.BeginInvoke(ShowTrayMenu);
+            handled = true;
+            return IntPtr.Zero;
+        }
         var result = ShellContextMenu.HandleWindowMessage(hwnd, msg, wParam, lParam, ref handled);
         return handled ? result : IntPtr.Zero;
     }

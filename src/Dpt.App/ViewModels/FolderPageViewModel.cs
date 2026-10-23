@@ -398,6 +398,17 @@ public sealed partial class FolderPageViewModel : PageViewModel
         SelectRequested?.Invoke(this, (item, rename));
     }
 
+    /// <summary>Category dialog (set by the app at startup).</summary>
+    public static Func<IReadOnlyList<string>, bool>? Categorize { get; set; }
+
+    [RelayCommand]
+    private void EditCategories()
+    {
+        var targets = SelectedItems.Count > 0 ? SelectedItems.Select(i => i.Path).ToList() : [FolderPath];
+        if (Categorize?.Invoke(targets) == true)
+            foreach (var i in SelectedItems) i.RefreshCategories();
+    }
+
     /// <summary>Bulk-rename dialog (set by the app at startup).</summary>
     public static Func<IReadOnlyList<Dpt.Core.Operations.RenameInput>, Task<int>>? BulkRename { get; set; }
 

@@ -80,6 +80,7 @@ public partial class FolderView : UserControl
 
         Toggle(ModifiedColumn, "Modified", 160);
         Toggle(TypeColumn, "Type", 170);
+        Toggle(CategoriesColumn, "Categories", 150);
         Toggle(SizeColumn, "Size", 110);
         UpdateSortGlyphs();
     }
@@ -174,6 +175,7 @@ public partial class FolderView : UserControl
             case Key.V when ctrl: await _vm.PasteCommand.ExecuteAsync(null); break;
             case Key.N when ctrl && shift: await _vm.NewFolderCommand.ExecuteAsync(null); break;
             case Key.D when ctrl: await _vm.DuplicateCommand.ExecuteAsync(null); break;
+            case Key.K when ctrl: _vm.EditCategoriesCommand.Execute(null); break;
             case Key.Apps: ShowContextMenu(null); break;
             default: handled = false; break;
         }

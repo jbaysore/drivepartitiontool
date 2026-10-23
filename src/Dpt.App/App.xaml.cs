@@ -38,13 +38,19 @@ public partial class App : Application
         Dpt.Storage.StorageInventory.RecycleBinLimit = Dpt.Shell.Operations.RecycleBin.MaxCapacityBytes;
         _ = services.Catalog.InitializeAsync();
         FolderPageViewModel.BulkRename = BulkRenameWindow.RunAsync;
+        FolderPageViewModel.Categorize = CategorizeWindow.Show;
+        RulesPageViewModel.EditRule = RuleEditorWindow.EditAsync;
+        RulesPageViewModel.PreviewRule = RulePreviewWindow.ShowAsync;
+        SearchPageViewModel.CategoryResolver = services.Categories.ResolveForSearchAsync;
+        services.RuleRunner.Start();
         SettingsView.ExtraContent = () => new CatalogPanel { DataContext = new CatalogPanelViewModel() };
         Starting?.Invoke(services);
         Log.Info("App", "Started");
 
         var start = CommandLine.StartLocations(e.Args);
         var main = new MainViewModel(start);
-        var window = new MainWindow { DataContext = main };
+        services.RuleRunner.Notified += (_, message) => Dispatcher.BeginInvoke(() => main.ShowToast(message));
+        var window = new MainWindow { DataContext = main, StartInTray = e.Args.Contains("--tray") };
         MainWindow = window;
         window.Show();
     }
@@ -105,5 +111,26 @@ public static class CommandLine
         }
 
         return list;
+    }
+}
+
+/// <summary>"Start at sign-in": a per-user Run entry that starts the app in the tray.</summary>
+public static class SignInStartup
+{
+    private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
+    private const string ValueName = "DrivePartitionTool";
+
+    public static void Apply(bool enabled)
+    {
+        using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(RunKey, writable: true);
+        if (key is null) return;
+        if (enabled && Environment.ProcessPath is { } exe) key.SetValue(ValueName, $"\"{exe}\" --tray");
+        else if (!enabled && key.GetValue(ValueName) is not null) key.DeleteValue(ValueName);
+    }
+
+    public static bool IsEnabled()
+    {
+        using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(RunKey);
+        return key?.GetValue(ValueName) is string;
     }
 }

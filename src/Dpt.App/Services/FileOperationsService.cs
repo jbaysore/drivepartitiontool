@@ -72,6 +72,9 @@ public sealed class FileOperationsService(AppServices services)
             Title = title,
         };
         var result = await RunWithActivityAsync(request, title);
+        if (kind == FileOperationKind.Move)
+            foreach (var c in result.Completed.Where(c => c.Source is not null && c.Destination is not null))
+                services.Categories.OnMoved(c.Source!, c.Destination!);
         var journalKind = kind == FileOperationKind.Copy ? JournalKind.Copy : JournalKind.Move;
         Journal(title, source, result.Completed.Where(c => c.Source is not null && c.Destination is not null)
             .Select(c => (journalKind, c.Source, c.Destination, c.IsFolder)));
@@ -109,7 +112,11 @@ public sealed class FileOperationsService(AppServices services)
         ReportFailures(result, "renamed");
         var done = result.Completed.FirstOrDefault();
         var newPath = done?.Destination ?? (File.Exists(target) || Directory.Exists(target) ? target : null);
-        if (newPath is not null) Journal($"Rename {Path.GetFileName(path)}", "manual", [(JournalKind.Rename, path, newPath, Directory.Exists(newPath))]);
+        if (newPath is not null)
+        {
+            services.Categories.OnMoved(path, newPath);
+            Journal($"Rename {Path.GetFileName(path)}", "manual", [(JournalKind.Rename, path, newPath, Directory.Exists(newPath))]);
+        }
         Notify([folder]);
         return newPath;
     }
@@ -353,6 +360,10 @@ public sealed class FileOperationsService(AppServices services)
                         if (Exists(e.DestPath)) toRecycle.Add(e.DestPath);
                         folders.Add(Path.GetDirectoryName(e.DestPath)!);
                         break;
+                    case JournalKind.Tag when e.SourcePath is not null && long.TryParse(e.DestPath, out var categoryId):
+                        // Tags were added before any move in the same batch; by now the item is back at its original path.
+                        services.Categories.UntagById(e.SourcePath, categoryId);
+                        break;
                     case JournalKind.Recycle when e.SourcePath is not null && e.DestPath is not null:
                         if (!RecycleBin.Restore(e.DestPath, e.SourcePath)) failures++;
                         folders.Add(Path.GetDirectoryName(e.SourcePath)!);
@@ -418,6 +429,8 @@ public sealed class FileOperationsService(AppServices services)
         var more = result.Failed.Count > 8 ? $"\n…and {result.Failed.Count - 8} more." : "";
         Dialogs.ShowError("Some items couldn't be " + verb, string.Join("\n", lines) + more);
     }
+
+    public void NotifyChanged(IEnumerable<string> folders) => Notify(folders);
 
     private void Notify(IEnumerable<string> folders)
     {

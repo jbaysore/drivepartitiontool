@@ -67,7 +67,7 @@ public sealed class AppSettings
     [Setting("Browsing", "Show folder sizes", "Shows the total size of everything inside each folder.", Order = 7)]
     public bool ShowFolderSizes { get; set; } = true;
 
-    [Setting("Browsing", "Visible columns", "Comma-separated columns for folder lists: Name, Modified, Type, Size, Created, Attributes.", Order = 8)]
+    [Setting("Browsing", "Visible columns", "Comma-separated columns for folder lists: Name, Modified, Type, Size, Categories.", Order = 8)]
     public string FolderColumns { get; set; } = "Name,Modified,Type,Size";
 
     // ---- Home ----

@@ -10,7 +10,7 @@ Evidence that each milestone's exit criteria in `IMPLEMENTATION_PLAN.md` are met
 | M2 — Index service, search, folder sizes | Done | see git log |
 | M3 — Storage insight | Done (VHD comparison runs with the next elevated batch) | see git log |
 | M4 — Safe file-operation engine | Done (VHD Recycle-Bin-limit test runs with the next elevated batch) | see git log |
-| M5 — Categories and rules | Not started | |
+| M5 — Categories and rules | Done | see git log |
 | M6 — Folder-structure experiments | Not started | |
 | M7 — Disk worker + partitions | Not started | |
 | M8 — Whole-drive clone | Not started | |
@@ -81,3 +81,14 @@ Evidence that each milestone's exit criteria in `IMPLEMENTATION_PLAN.md` are met
   - New `Dpt.App.Tests` (scripted owner): blocked recycle + Cancel keeps both items; + "Permanently delete" removes; Shift+Del does nothing unless confirmed; conflicts cancel/skip/replace; folder-into-itself refused; undo of move, rename, new folder, copy and recycle; bulk rename chain 1→2, 2→3 and its undo; duplicate; name validation. 9/9 pass.
   - `Dpt.Core.Tests` bulk-rename planner tests (templates, regex, case, extension, duplicates, clashes).
   - `ElevatedRecycleTests.Item_larger_than_the_recycle_bin_limit_is_blocked_not_deleted` (VHD with a 1 MB bin limit) — **pending the next elevated run**.
+
+## M5 — Categories and rules
+
+- Categories: `categories` + `item_tags` keyed by volume serial + file ID (`FileIdentity`), so tags follow renames/moves; stale paths are re-resolved with `OpenFileById` + `GetFinalPathNameByHandle`; path-only fallback for file systems without IDs (updated when the app moves/renames). Tri-state "Categories…" dialog (Ctrl+K) for selections; optional Categories column; `cat:Name` search filter (AND across categories); category list with counts, rename, delete, "show items".
+- Rules (`Dpt.Core.Rules`): folders (+subfolders), file/folder/both, all/any condition groups (name contains/starts/ends/is/pattern incl. `/regex/`, extension list, type group, size, modified/created older/newer/before/after, category, location), actions tag and/or move to a template folder (`{year} {month} {monthname} {day} {ext} {type} {category} {name}`), conflict policy, trigger manual/automatic, scope existing/new/both. `RuleDescriber` writes the plain-language sentence shown everywhere.
+- `RuleService`: preview plans (matches, destinations, conflicts, totals); moving rules refuse to run until previewed (and changing what/where they move resets that); automatic rules watch their folders, ignore downloads in progress (`.crdownload`, `.part`, …) and wait for files to settle; each run is one journal batch (moves + tags) undone together with Ctrl+Z.
+- UI: Rules & categories page, sentence-style rule editor with live summary and live match count, preview window with "Run now", notifications for automatic runs; keep running in the notification area while automatic rules exist (open / pause rules / exit), "Start at sign-in" (HKCU Run entry, only changed when the owner flips the setting).
+- **Evidence:**
+  - `RuleEngineTests` (Core, 20 cases): folder scoping, every clause type, all/any/nested groups, destination templates, categories added only once, folder-into-itself guard. Core total 83 pass.
+  - `RuleServiceTests` (App): preview lists the planned move and a moving rule refuses to run before preview; **new file arrives → automatic rule tags and moves it → Ctrl+Z restores it and removes the tag**; tags follow a rename and `cat:` resolves the new path; in-progress downloads ignored.
+  - Screenshot of the Rules & categories page with two sample rules (since removed from the scratch database).

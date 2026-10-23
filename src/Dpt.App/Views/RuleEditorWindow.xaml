@@ -1,0 +1,123 @@
+<Window x:Class="Dpt.App.Views.RuleEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="clr-namespace:Dpt.App.Controls"
+        xmlns:vm="clr-namespace:Dpt.App.ViewModels"
+        Title="Rule" Width="820" Height="760" MinWidth="640" MinHeight="520"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{DynamicResource DptWindow}" Foreground="{DynamicResource DptInk}"
+        FontFamily="{StaticResource UiFont}" FontSize="13" AutomationProperties.AutomationId="RuleEditorWindow">
+    <Window.Resources>
+        <Style x:Key="Step" TargetType="TextBlock" BasedOn="{StaticResource H2}">
+            <Setter Property="Margin" Value="0,16,0,6" />
+        </Style>
+    </Window.Resources>
+    <DockPanel Margin="22,18">
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,14,0,0">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button Style="{StaticResource SecondaryButton}" Content="Cancel" IsCancel="True" Margin="0,0,8,0" />
+                <Button Style="{StaticResource PrimaryButton}" Content="Save rule" IsDefault="True" Click="OnSave" AutomationProperties.AutomationId="SaveRule" />
+            </StackPanel>
+            <TextBlock Text="{Binding Problem}" Foreground="{DynamicResource DptRed}" VerticalAlignment="Center" TextWrapping="Wrap" />
+        </DockPanel>
+
+        <Border DockPanel.Dock="Bottom" Style="{StaticResource InfoPanel}" Margin="0,12,0,0">
+            <StackPanel>
+                <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" AutomationProperties.AutomationId="RuleSummary" />
+                <TextBlock Text="{Binding MatchCount}" Style="{StaticResource Small}" Margin="0,4,0,0" AutomationProperties.AutomationId="RuleMatchCount" />
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <DockPanel>
+                    <TextBlock Text="Rule name" VerticalAlignment="Center" Width="90" />
+                    <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.AutomationId="RuleName" />
+                </DockPanel>
+
+                <TextBlock Text="1. Where to look" Style="{StaticResource Step}" />
+                <WrapPanel>
+                    <TextBlock Text="When a" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <ComboBox ItemsSource="{Binding KindOptions}" SelectedItem="{Binding Kind}" DisplayMemberPath="Label" MinWidth="130" />
+                    <TextBlock Text="appears in or is in:" VerticalAlignment="Center" Margin="6,0" />
+                </WrapPanel>
+                <ItemsControl ItemsSource="{Binding Folders}" Margin="0,6,0,0">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <DockPanel Margin="0,2">
+                                <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="Remove"
+                                        Command="{Binding DataContext.RemoveFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" />
+                                <c:Icon Data="{StaticResource Icon.Folder}" Size="14" Foreground="{DynamicResource DptMuted}" Margin="0,0,8,0" />
+                                <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+                            </DockPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                    <Button Style="{StaticResource SecondaryButton}" Content="Add folder…" Click="OnAddFolder" />
+                    <CheckBox Content="Include subfolders" IsChecked="{Binding IncludeSubfolders}" VerticalAlignment="Center" Margin="14,0,0,0" />
+                </StackPanel>
+
+                <TextBlock Text="2. What must match" Style="{StaticResource Step}" />
+                <WrapPanel Margin="0,0,0,6">
+                    <TextBlock Text="Match" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <ComboBox ItemsSource="{Binding MatchOptions}" SelectedItem="{Binding Match}" DisplayMemberPath="Label" MinWidth="80" />
+                    <TextBlock Text="of these (no conditions = everything there):" VerticalAlignment="Center" Margin="6,0" />
+                </WrapPanel>
+                <ItemsControl ItemsSource="{Binding Clauses}" AutomationProperties.AutomationId="RuleClauses">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,3">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150" />
+                                    <ColumnDefinition Width="190" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ComboBox ItemsSource="{x:Static Member=vm:ClauseRow.Fields}" SelectedItem="{Binding Field}" DisplayMemberPath="Label" />
+                                <ComboBox Grid.Column="1" Margin="6,0" ItemsSource="{Binding Operators}" SelectedItem="{Binding Operator}" DisplayMemberPath="Label" />
+                                <Grid Grid.Column="2">
+                                    <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Visibility="{Binding IsText, Converter={StaticResource BoolToVisible}}" ToolTip="{Binding Hint}" />
+                                    <ComboBox ItemsSource="{x:Static Member=vm:ClauseRow.TypeValues}" SelectedItem="{Binding Value}"
+                                              Visibility="{Binding IsType, Converter={StaticResource BoolToVisible}}" />
+                                </Grid>
+                                <Button Grid.Column="3" Style="{StaticResource IconButton}" ToolTip="Remove condition" Margin="6,0,0,0"
+                                        Command="{Binding DataContext.RemoveClauseCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}">
+                                    <c:Icon Data="{StaticResource Icon.X}" Size="13" />
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Style="{StaticResource LinkButton}" Content="+ Add condition" Command="{Binding AddClauseCommand}" Margin="0,6,0,0" HorizontalAlignment="Left" />
+
+                <TextBlock Text="3. What happens" Style="{StaticResource Step}" />
+                <DockPanel Margin="0,0,0,6">
+                    <TextBlock Text="Tag with categories" VerticalAlignment="Center" Width="160" />
+                    <TextBox Text="{Binding Categories, UpdateSourceTrigger=PropertyChanged}" ToolTip="Comma-separated, e.g. Photos, Inbox" AutomationProperties.AutomationId="RuleCategories" />
+                </DockPanel>
+                <DockPanel>
+                    <CheckBox Content="Move it to" IsChecked="{Binding MoveEnabled}" VerticalAlignment="Center" Width="160" AutomationProperties.AutomationId="RuleMoveEnabled" />
+                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Browse…" Click="OnBrowseDest" Margin="6,0,0,0" IsEnabled="{Binding MoveEnabled}" />
+                    <TextBox Text="{Binding MoveTo, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding MoveEnabled}" AutomationProperties.AutomationId="RuleMoveTo" />
+                </DockPanel>
+                <TextBlock Style="{StaticResource Small}" TextWrapping="Wrap" Margin="160,4,0,6"
+                           Text="Folder names can use {year}, {month}, {monthname}, {day}, {ext}, {type}, {category}, {name}. Missing folders are created." />
+                <WrapPanel IsEnabled="{Binding MoveEnabled}">
+                    <TextBlock Text="If an item with the same name is already there:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <ComboBox ItemsSource="{Binding ConflictOptions}" SelectedItem="{Binding Conflict}" DisplayMemberPath="Label" MinWidth="220" />
+                </WrapPanel>
+
+                <TextBlock Text="4. When it runs" Style="{StaticResource Step}" />
+                <WrapPanel>
+                    <TextBlock Text="Run" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <ComboBox ItemsSource="{Binding TriggerOptions}" SelectedItem="{Binding Trigger}" DisplayMemberPath="Label" MinWidth="180" AutomationProperties.AutomationId="RuleTrigger" />
+                    <TextBlock Text="on" VerticalAlignment="Center" Margin="8,0,6,0" />
+                    <ComboBox ItemsSource="{Binding ScopeOptions}" SelectedItem="{Binding Scope}" DisplayMemberPath="Label" MinWidth="250" />
+                </WrapPanel>
+                <TextBlock Style="{StaticResource Small}" TextWrapping="Wrap" Margin="0,6,0,0"
+                           Text="Rules that move files show a preview the first time, and every change you make to where or what they move means a new preview. Each run can be undone with Ctrl+Z." />
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>
