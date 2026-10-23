@@ -41,7 +41,16 @@ public class ElevatedRecycleTests
 
             var r = await new FileOperationEngine().RunAsync(new FileOperationRequest { Kind = FileOperationKind.Recycle, Sources = [big, small] });
 
-            Assert.True(File.Exists(big), "The oversized file must still exist.");
+            if (!File.Exists(big))
+            {
+                // Where did it go? Recycled anyway (recoverable) or deleted permanently (a real failure)?
+                var done = r.Completed.FirstOrDefault(c => string.Equals(c.Source, big, StringComparison.OrdinalIgnoreCase));
+                var inBin = Directory.EnumerateFiles(Path.Combine(vhd.Root, "$Recycle.Bin"), "$R*", new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = 0 })
+                    .Where(f => new FileInfo(f).Length == 8 * 1024 * 1024).ToList();
+                Assert.Fail($"The oversized file left its folder. Engine result: completed={done is not null} dest={done?.Destination ?? "none"} destExists={(done?.Destination is { } d && File.Exists(d))}; " +
+                            $"blocked={r.BlockedFromRecycle.Count}; failed={string.Join(";", r.Failed.Select(f => f.Message))}; 8 MB files in this drive's Recycle Bin: {inBin.Count} ({string.Join(", ", inBin)}).");
+            }
+
             var blocked = Assert.Single(r.BlockedFromRecycle);
             Assert.Equal(big, blocked.Path, ignoreCase: true);
             Assert.False(File.Exists(small), "The small file should have gone to the Recycle Bin.");

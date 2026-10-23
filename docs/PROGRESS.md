@@ -8,11 +8,11 @@ Evidence that each milestone's exit criteria in `IMPLEMENTATION_PLAN.md` are met
 | M0 — Bootstrap | Done | see git log |
 | M1 — Explorer shell | Done | see git log |
 | M2 — Index service, search, folder sizes | Done | see git log |
-| M3 — Storage insight | Done (VHD comparison runs with the next elevated batch) | see git log |
-| M4 — Safe file-operation engine | Done (VHD Recycle-Bin-limit test runs with the next elevated batch) | see git log |
+| M3 — Storage insight | Done | see git log |
+| M4 — Safe file-operation engine | Done | see git log |
 | M5 — Categories and rules | Done | see git log |
 | M6 — Folder-structure experiments | Done | see git log |
-| M7 — Disk worker + partitions | In progress (code done; elevated VHD run pending) | see git log |
+| M7 — Disk worker + partitions | Done | see git log |
 | M8 — Whole-drive clone | Not started | |
 | M9 — Windows-only copy + boot repair | Not started | |
 | M10 — Integration and release | Not started | |
@@ -66,7 +66,7 @@ Evidence that each milestone's exit criteria in `IMPLEMENTATION_PLAN.md` are met
 - Drives page: card per disk with a proportional partition bar (`ProportionalPanel`), badges ("Windows starts from here", USB, Virtual, unallocated), per-partition usage meters, Open. Largest items page: files/folders, drive/type/age filters, include-hidden, "show the specific folders" (drops parents ≥ 80 % explained by a listed subfolder), size bars, size on disk, file counts, folder drill-down with Back, open location, recycle (M4 guard), move to. `--open <Page>` argument.
 - **Evidence:**
   - `StorageInventoryTests.Inventory_matches_get_disk_and_get_partition` (non-elevated): every disk's name, size, boot flag, partition style and every partition's number, offset, size, drive letter and GPT type match `Get-Disk`/`Get-Partition` on this PC; system volume tagged "Windows is here".
-  - `Attached_test_vhd_appears_as_virtual_disk_with_its_partition` (elevated, test VHDX) — **pending the next elevated run**.
+  - `Attached_test_vhd_appears_as_virtual_disk_with_its_partition` (elevated, test VHDX): passes (2026-10-23).
   - UI (UIA reads only): `Largest_items_lists_biggest_files_and_folders` (largest file first; folder view shows `2024`, hides `Movies` that it fully explains), `Drives_page_lists_disks`.
   - Screenshot of the Drives page checked against `Get-Disk`/`Get-Partition` (2 NVMe disks, MBR D:, GPT C: with System Reserved/Recovery/EFI).
 
@@ -80,7 +80,7 @@ Evidence that each milestone's exit criteria in `IMPLEMENTATION_PLAN.md` are met
   - `Dpt.Shell.Tests` (temp folders): copy/move, copy-name in same folder, conflict policies, rename/new folder/new file, recycle then restore from the `$R` path, permanent delete refused without matching confirmation, SUBST (no Recycle Bin) items blocked and kept.
   - New `Dpt.App.Tests` (scripted owner): blocked recycle + Cancel keeps both items; + "Permanently delete" removes; Shift+Del does nothing unless confirmed; conflicts cancel/skip/replace; folder-into-itself refused; undo of move, rename, new folder, copy and recycle; bulk rename chain 1→2, 2→3 and its undo; duplicate; name validation. 9/9 pass.
   - `Dpt.Core.Tests` bulk-rename planner tests (templates, regex, case, extension, duplicates, clashes).
-  - `ElevatedRecycleTests.Item_larger_than_the_recycle_bin_limit_is_blocked_not_deleted` (VHD with a 1 MB bin limit) — **pending the next elevated run**.
+  - `ElevatedRecycleTests.Item_larger_than_the_recycle_bin_limit_is_blocked_not_deleted` (VHD with a 1 MB bin limit): **its first run failed and exposed a real bug** — Windows' "recycle if possible" mode permanently deleted the 8 MB file and the per-item guard did not stop it (`PreDeleteItem` still reported "recycle if possible"). Fix (2026-10-23): the engine now measures each item (folders totalled) and compares it with the drive's effective Recycle Bin limit (configured size, 0 for "delete immediately", or a cautious 5 % default) **before** anything reaches Windows; items that don't fit are blocked for the owner's decision. Any item Windows reports as deleted without arriving in the Recycle Bin is reported as a failure, never as done. Rerun passes: oversized file kept and listed as blocked, small file recycled.
 
 ## M5 — Categories and rules
 
@@ -106,10 +106,10 @@ Evidence that each milestone's exit criteria in `IMPLEMENTATION_PLAN.md` are met
   - `LayoutServiceTests.Ten_thousand_files_preview_matches_result_and_undo_restores` (App): 10,000 generated files in 185 folders, 28 name clashes; per-folder file counts after applying exactly equal the preview tree; source emptied; one Ctrl+Z restores every original path. Plan 2.9 s, apply 23 s, undo 24 s.
   - Screenshot of the Folder layouts editor.
 
-## M7 — Disk worker and partition management (in progress)
+## M7 — Disk worker and partition management
 
 - `Dpt.Ipc` disk plan contracts: `DiskPlan` (target/source `DiskFingerprint` = number + unique ID + serial + size + partition-table hash, steps, typed confirmation, unlock flag, status file), progress lines, exit codes.
 - `Dpt.DiskWorker` (`requireAdministrator` manifest, one UAC prompt per operation): checks typed confirmation → **virtual-only safety mode** (always in Debug builds and with `DPT_SAFETY=virtual-only`; refuses any disk whose bus type isn't File Backed Virtual) → fingerprint (refuses if the disk or its partitions changed since the preview) → protection (`PlanRunner.CheckProtection`: never the running Windows partition; boot/EFI/recovery/MSR locked unless unlocked in Settings; never initialize/clone onto the boot disk) → executes via Storage WMI (`StorageOperations`: initialize, create (+format), delete, resize with `GetSupportedSize` bounds, format, drive letter, label, offline/online), re-checking disk identity before every step; JSON-lines status file.
 - App: Disk tools page (clickable partition bars, actions limited to what makes sense for the selection with reasons when disabled, development-build notice), action dialog with before/after bars, plain-language "your data" / "undo" notes, typed confirmation for delete/format, progress from the worker (`DiskWorkerLauncher`), entry points for clone / Windows copy / boot health (M8/M9).
 - **Evidence so far:** `DiskWorkerRefusalTests` (non-elevated, 6 tests; safety and protection rules tested as pure checks or read-only probes so no test can reach a write on a real disk): physical disk refused in virtual-only mode; confirmation mismatch refused; changed partition table refused; Windows partition refused even when unlocked (format/delete/resize/letter/initialize); EFI/recovery refused unless unlocked. Screenshot of the Disk tools page.
-- **Pending (needs one elevated run):** `PartitionOperationTests` (shrink → create exFAT → rename → format NTFS → change/remove letter → delete → extend back, stale-plan refusal, recreate on emptied disk), plus the M3 VHD inventory test and the M4 Recycle-Bin-limit test.
+- **Elevated evidence (2026-10-23, `tools/run-elevated-tests.ps1`, projects run one at a time, transcript in `.local/elevated-tests.log`):** `PartitionOperationTests.Shrink_create_format_letter_label_delete_extend` (shrink to 400 MB → create exFAT "DPTNEW" with a letter → rename → reformat NTFS → move letter → remove letter → delete → extend back to the original size, each through the real elevated worker), `Worker_refuses_a_plan_whose_disk_changed` (stale fingerprint refused after a separate shrink), `Initialize_a_blank_disk` (delete the only partition, create FAT32) — all pass. The runner now also detaches and deletes leftover test disks from interrupted runs.

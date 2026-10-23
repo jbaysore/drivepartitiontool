@@ -93,7 +93,16 @@ public sealed class FileOperationEngine
         {
             // Each pass recycles what it can. If Windows reports an item would be permanently deleted, the sink blocks it,
             // which may abort the rest of that pass; the next pass retries the remaining items without the blocked ones.
-            var remaining = r.Sources.ToList();
+            // Items too big for their drive's Recycle Bin (or on a drive that deletes immediately) are held back here:
+            // Windows' "recycle if possible" mode would otherwise delete them permanently without asking.
+            var remaining = new List<string>();
+            foreach (var s in r.Sources)
+            {
+                var size = RecycleBin.SizeOf(s);
+                if (RecycleBin.PrecheckReason(s, size) is { } reason) result.BlockedFromRecycle.Add(new BlockedItem(s, size, reason));
+                else remaining.Add(s);
+            }
+
             for (var pass = 0; pass < MaxRecyclePasses && remaining.Count > 0 && !control.IsCancelled; pass++)
             {
                 var sink = RunPass(r, remaining, result, progress, control);
@@ -104,6 +113,13 @@ public sealed class FileOperationEngine
                 var next = remaining.Where(p => !handled.Contains(p) && (File.Exists(p) || Directory.Exists(p))).ToList();
                 if (!sink.BlockedThisPass || next.Count == remaining.Count) break;
                 remaining = next;
+            }
+
+            // Belt and braces: anything Windows reports as deleted that didn't arrive in the Recycle Bin is reported, not hidden.
+            foreach (var c in result.Completed.Where(c => c.Destination is null || !(File.Exists(c.Destination) || Directory.Exists(c.Destination))).ToList())
+            {
+                result.Completed.Remove(c);
+                result.Failed.Add(new FailedItem(c.Source ?? "", "Windows deleted this item permanently instead of putting it in the Recycle Bin."));
             }
         }
         else

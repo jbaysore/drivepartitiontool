@@ -30,8 +30,41 @@ public static class RecycleBin
     }
 
     /// <summary>
-    /// Advisory pre-check: why an item probably can't go to the Recycle Bin, or null if it probably can.
-    /// The engine's per-item guard is still the authority; this only lets the UI warn up front.
+    /// The Recycle Bin limit Windows will apply to this item's drive: the configured size, 0 when the drive deletes
+    /// immediately, or (when no size is configured) a cautious estimate of Windows' default (5 % of the drive).
+    /// </summary>
+    public static long? EffectiveCapacityBytes(string path)
+    {
+        if (MaxCapacityBytes(path) is { } configured) return configured;
+        try
+        {
+            var root = Path.GetPathRoot(Path.GetFullPath(path));
+            return root is null ? null : new DriveInfo(root).TotalSize / 20;
+        }
+        catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Total size of a file, or of everything inside a folder.</summary>
+    public static long? SizeOf(string path)
+    {
+        try
+        {
+            if (File.Exists(path)) return new FileInfo(path).Length;
+            if (Directory.Exists(path)) return FileSystem.FolderSizeCalculator.Compute(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Why an item can't go to the Recycle Bin, or null if it can. The engine applies this before handing anything to
+    /// Windows, because Windows' "recycle if possible" mode permanently deletes items that are too big for the bin.
     /// </summary>
     public static string? PrecheckReason(string path, long? sizeBytes)
     {
@@ -42,7 +75,7 @@ public static class RecycleBin
             if (root.StartsWith(@"\\", StringComparison.Ordinal)) return "Network locations don't have a Recycle Bin.";
             var drive = new DriveInfo(root);
             if (drive.DriveType == DriveType.Network) return "Network drives don't have a Recycle Bin.";
-            var max = MaxCapacityBytes(path);
+            var max = EffectiveCapacityBytes(path);
             if (max == 0) return "This drive is set to delete items immediately instead of using the Recycle Bin.";
             if (max is { } m && sizeBytes is { } s && s > m)
                 return $"It is larger than this drive's Recycle Bin limit ({Core.Formatting.SizeFormatter.Format(m)}).";
