@@ -88,6 +88,7 @@ public sealed partial class FolderPageViewModel : PageViewModel
         CopyCommand.NotifyCanExecuteChanged();
         CutCommand.NotifyCanExecuteChanged();
         RenameCommand.NotifyCanExecuteChanged();
+        DuplicateCommand.NotifyCanExecuteChanged();
     }
 
     public override void Activate()
@@ -397,13 +398,25 @@ public sealed partial class FolderPageViewModel : PageViewModel
         SelectRequested?.Invoke(this, (item, rename));
     }
 
+    /// <summary>Bulk-rename dialog (set by the app at startup).</summary>
+    public static Func<IReadOnlyList<Dpt.Core.Operations.RenameInput>, Task<int>>? BulkRename { get; set; }
+
     [RelayCommand(CanExecute = nameof(HasSelection))]
-    private void Rename()
+    private async Task Rename()
     {
+        if (SelectedItems.Count > 1 && BulkRename is not null)
+        {
+            await BulkRename(SelectedItems.Select(i => new Dpt.Core.Operations.RenameInput(i.Path, i.IsFolder, i.Modified)).ToList());
+            return;
+        }
+
         var item = SelectedItems.FirstOrDefault();
         if (item is null) return;
         BeginRename(item);
     }
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private async Task Duplicate() => await Services.FileOps.DuplicateAsync(SelectedItems.Select(i => i.Path).ToList());
 
     public void BeginRename(FileItemViewModel item)
     {
@@ -508,7 +521,7 @@ public sealed partial class FolderPageViewModel : PageViewModel
         switch (verb)
         {
             case "delete": await Recycle(); break;
-            case "rename": Rename(); break;
+            case "rename": await Rename(); break;
             case "cut": Cut(); break;
             case "copy": Copy(); break;
             case "paste": await Paste(); break;

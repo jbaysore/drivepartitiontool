@@ -67,6 +67,7 @@
                         <c:Icon Data="{StaticResource Icon.MoreH}" Size="16" StrokeWidth="3" />
                         <Button.ContextMenu>
                             <ContextMenu>
+                                <MenuItem Header="Duplicate here" InputGestureText="Ctrl+D" Command="{Binding DuplicateCommand}" />
                                 <MenuItem Header="Copy path" InputGestureText="Ctrl+Shift+C" Command="{Binding CopyPathCommand}" />
                                 <MenuItem Header="Properties" InputGestureText="Alt+Enter" Command="{Binding PropertiesCommand}" />
                                 <Separator />
@@ -122,7 +123,7 @@
                             <TextBlock Text="Copy to…" Margin="7,0,0,0" />
                         </StackPanel>
                     </Button>
-                    <Button Style="{StaticResource CommandButton}" Command="{Binding RenameCommand}" ToolTip="Rename (F2)" AutomationProperties.AutomationId="RenameButton">
+                    <Button Style="{StaticResource CommandButton}" Command="{Binding RenameCommand}" ToolTip="Rename (F2). With several items selected, rename them all with a pattern." AutomationProperties.AutomationId="RenameButton">
                         <StackPanel Orientation="Horizontal">
                             <c:Icon Data="{StaticResource Icon.Pencil}" Size="15" />
                             <TextBlock Text="Rename" Margin="7,0,0,0" />

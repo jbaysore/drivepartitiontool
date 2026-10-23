@@ -9,7 +9,7 @@ Evidence that each milestone's exit criteria in `IMPLEMENTATION_PLAN.md` are met
 | M1 — Explorer shell | Done | see git log |
 | M2 — Index service, search, folder sizes | Done | see git log |
 | M3 — Storage insight | Done (VHD comparison runs with the next elevated batch) | see git log |
-| M4 — Safe file-operation engine | Not started | |
+| M4 — Safe file-operation engine | Done (VHD Recycle-Bin-limit test runs with the next elevated batch) | see git log |
 | M5 — Categories and rules | Not started | |
 | M6 — Folder-structure experiments | Not started | |
 | M7 — Disk worker + partitions | Not started | |
@@ -69,3 +69,15 @@ Evidence that each milestone's exit criteria in `IMPLEMENTATION_PLAN.md` are met
   - `Attached_test_vhd_appears_as_virtual_disk_with_its_partition` (elevated, test VHDX) — **pending the next elevated run**.
   - UI (UIA reads only): `Largest_items_lists_biggest_files_and_folders` (largest file first; folder view shows `2024`, hides `Movies` that it fully explains), `Drives_page_lists_disks`.
   - Screenshot of the Drives page checked against `Get-Disk`/`Get-Partition` (2 NVMe disks, MBR D:, GPT C: with System Reserved/Recovery/EFI).
+
+## M4 — Safe file-operation engine
+
+- Built on the M1 engine: every operation runs through `IFileOperation` on its own STA thread (several at once), each with progress, pause/resume and cancel in the activity flyout; journaled for undo.
+- Recycle guard: `FOFX_RECYCLEONDELETE`; `PreDeleteItem` without `TSF_DELETE_RECYCLE_IF_POSSIBLE` → item blocked (never deleted) and listed; up-front warning from the per-volume Recycle Bin limit/NukeOnDelete (`RecycleBin.PrecheckReason`); dialog "Cancel — keep them" / "Permanently delete these"; permanent deletion only via a `PermanentDeleteConfirmation` covering every path.
+- Conflicts: Replace / Skip / Keep both per item with "set all to"; moving/copying a folder into itself is refused.
+- Bulk actions: recycle / move to / copy to on multi-selections, search results and largest items; **bulk rename** (`BulkRenamePlanner`: `{name}`, `{n:000}`, `{date:…}`, `{folder}`, find/replace incl. regex, letter case, extension; duplicate/clash/invalid-name checks; live preview; two-step temporary names for swaps/chains; undo as one batch); **Duplicate here** (Ctrl+D) and Copy to… for cloning files/folders.
+- **Evidence:**
+  - `Dpt.Shell.Tests` (temp folders): copy/move, copy-name in same folder, conflict policies, rename/new folder/new file, recycle then restore from the `$R` path, permanent delete refused without matching confirmation, SUBST (no Recycle Bin) items blocked and kept.
+  - New `Dpt.App.Tests` (scripted owner): blocked recycle + Cancel keeps both items; + "Permanently delete" removes; Shift+Del does nothing unless confirmed; conflicts cancel/skip/replace; folder-into-itself refused; undo of move, rename, new folder, copy and recycle; bulk rename chain 1→2, 2→3 and its undo; duplicate; name validation. 9/9 pass.
+  - `Dpt.Core.Tests` bulk-rename planner tests (templates, regex, case, extension, duplicates, clashes).
+  - `ElevatedRecycleTests.Item_larger_than_the_recycle_bin_limit_is_blocked_not_deleted` (VHD with a 1 MB bin limit) — **pending the next elevated run**.

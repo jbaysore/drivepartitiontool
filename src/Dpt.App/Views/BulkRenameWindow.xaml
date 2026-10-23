@@ -1,0 +1,76 @@
+<Window x:Class="Dpt.App.Views.BulkRenameWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Rename items" Width="760" Height="620" MinWidth="560" MinHeight="420"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{DynamicResource DptWindow}" Foreground="{DynamicResource DptInk}"
+        FontFamily="{StaticResource UiFont}" FontSize="13" AutomationProperties.AutomationId="BulkRenameWindow">
+    <DockPanel Margin="20,18">
+        <StackPanel DockPanel.Dock="Top">
+            <TextBlock Text="Rename items" Style="{StaticResource H2}" FontSize="16" Margin="0,0,0,4" />
+            <TextBlock Style="{StaticResource Small}" TextWrapping="Wrap" Margin="0,0,0,12"
+                       Text="Build new names from a pattern: {name} is the current name, {n} or {n:000} a number, {date} or {date:yyyy-MM} the date modified, {folder} the folder's name." />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="110" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock Text="New name" VerticalAlignment="Center" />
+                <TextBox Grid.Column="1" Text="{Binding Template, UpdateSourceTrigger=PropertyChanged}" Margin="0,3" AutomationProperties.AutomationId="RenameTemplate" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="10,0,0,0">
+                    <TextBlock Text="Start at" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <TextBox Text="{Binding StartNumber, UpdateSourceTrigger=PropertyChanged}" Width="60" />
+                </StackPanel>
+
+                <TextBlock Grid.Row="1" Text="Find" VerticalAlignment="Center" />
+                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Find, UpdateSourceTrigger=PropertyChanged}" Margin="0,3" AutomationProperties.AutomationId="RenameFind" />
+                <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal" Margin="10,0,0,0">
+                    <CheckBox Content="Pattern (regex)" IsChecked="{Binding UseRegex}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                    <CheckBox Content="Match case" IsChecked="{Binding MatchCase}" VerticalAlignment="Center" />
+                </StackPanel>
+
+                <TextBlock Grid.Row="2" Text="Replace with" VerticalAlignment="Center" />
+                <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Replace, UpdateSourceTrigger=PropertyChanged}" Margin="0,3" AutomationProperties.AutomationId="RenameReplace" />
+
+                <TextBlock Grid.Row="3" Text="Letters" VerticalAlignment="Center" />
+                <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding CaseOptions}" SelectedIndex="{Binding CaseIndex}" Margin="0,3" HorizontalAlignment="Left" MinWidth="180" />
+
+                <CheckBox Grid.Row="4" Content="Extension" IsChecked="{Binding ChangeExtension}" VerticalAlignment="Center" />
+                <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding Extension, UpdateSourceTrigger=PropertyChanged}" Margin="0,3" HorizontalAlignment="Left" Width="120"
+                         IsEnabled="{Binding ChangeExtension}" />
+            </Grid>
+        </StackPanel>
+
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button Style="{StaticResource SecondaryButton}" Content="Cancel" IsCancel="True" Margin="0,0,8,0" />
+                <Button Style="{StaticResource PrimaryButton}" Content="Rename" IsDefault="True" IsEnabled="{Binding CanApply}" Click="OnApply" AutomationProperties.AutomationId="RenameApply" />
+            </StackPanel>
+            <TextBlock Text="{Binding Summary}" Style="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="Wrap" AutomationProperties.AutomationId="RenameSummary" />
+        </DockPanel>
+
+        <ListView ItemsSource="{Binding Preview}" Margin="0,14,0,0" BorderBrush="{DynamicResource DptBorder}" AutomationProperties.AutomationId="RenamePreview">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="Current name" Width="250" DisplayMemberBinding="{Binding OldName}" />
+                    <GridViewColumn Header="New name" Width="250" DisplayMemberBinding="{Binding NewName}" />
+                    <GridViewColumn Header="" Width="220">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Problem}" Foreground="{DynamicResource DptRed}" TextWrapping="Wrap" />
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+                </GridView>
+            </ListView.View>
+        </ListView>
+    </DockPanel>
+</Window>

@@ -37,6 +37,7 @@ public partial class App : Application
         services.Drives.Refresh();
         Dpt.Storage.StorageInventory.RecycleBinLimit = Dpt.Shell.Operations.RecycleBin.MaxCapacityBytes;
         _ = services.Catalog.InitializeAsync();
+        FolderPageViewModel.BulkRename = BulkRenameWindow.RunAsync;
         SettingsView.ExtraContent = () => new CatalogPanel { DataContext = new CatalogPanelViewModel() };
         Starting?.Invoke(services);
         Log.Info("App", "Started");

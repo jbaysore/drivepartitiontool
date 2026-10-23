@@ -165,7 +165,7 @@ public partial class FolderView : UserControl
             case Key.Enter when ctrl: _vm.OpenInNewTabCommand.Execute(null); break;
             case Key.Enter: _vm.OpenCommand.Execute(null); break;
             case Key.Back: _vm.Tab.UpCommand.Execute(null); break;
-            case Key.F2: _vm.RenameCommand.Execute(null); break;
+            case Key.F2: await _vm.RenameCommand.ExecuteAsync(null); break;
             case Key.Delete when shift: await _vm.PermanentDeleteCommand.ExecuteAsync(null); break;
             case Key.Delete: await _vm.RecycleCommand.ExecuteAsync(null); break;
             case Key.C when ctrl && shift: _vm.CopyPathCommand.Execute(null); break;
@@ -173,6 +173,7 @@ public partial class FolderView : UserControl
             case Key.X when ctrl: _vm.CutCommand.Execute(null); break;
             case Key.V when ctrl: await _vm.PasteCommand.ExecuteAsync(null); break;
             case Key.N when ctrl && shift: await _vm.NewFolderCommand.ExecuteAsync(null); break;
+            case Key.D when ctrl: await _vm.DuplicateCommand.ExecuteAsync(null); break;
             case Key.Apps: ShowContextMenu(null); break;
             default: handled = false; break;
         }

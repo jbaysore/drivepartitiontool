@@ -114,6 +114,66 @@ public sealed class FileOperationsService(AppServices services)
         return newPath;
     }
 
+    /// <summary>
+    /// Renames many items in one undoable batch. Uses temporary names first when a new name is another selected item's
+    /// current name (so swaps and chains like 1→2, 2→3 work).
+    /// </summary>
+    public async Task<int> RenameManyAsync(IReadOnlyList<(string Path, string NewName)> renames, string title, string source = "manual")
+    {
+        var changes = renames.Where(r => !string.Equals(Path.GetFileName(r.Path), r.NewName, StringComparison.Ordinal)).ToList();
+        if (changes.Count == 0) return 0;
+        var activity = services.Activity.Start(title);
+        var done = await RenameManyCoreAsync(changes, activity);
+        Journal(title, source, done.Select(d => (JournalKind.Rename, (string?)d.From, (string?)d.To, Directory.Exists(d.To))));
+        activity.Complete($"Renamed {done.Count} of {changes.Count}", error: done.Count < changes.Count);
+        if (done.Count < changes.Count) Dialogs.ShowError("Some items couldn't be renamed", $"{changes.Count - done.Count} item(s) kept their old names (in use or access denied).");
+        Notify(changes.Select(c => Path.GetDirectoryName(c.Path)!));
+        return done.Count;
+    }
+
+    private async Task<List<(string From, string To)>> RenameManyCoreAsync(IReadOnlyList<(string Path, string NewName)> changes, ActivityItem? activity)
+    {
+        var selected = new HashSet<string>(changes.Select(c => c.Path), StringComparer.OrdinalIgnoreCase);
+        var needsTemp = changes.Any(c => selected.Contains(Path.Combine(Path.GetDirectoryName(c.Path)!, c.NewName)) &&
+                                         !string.Equals(c.Path, Path.Combine(Path.GetDirectoryName(c.Path)!, c.NewName), StringComparison.OrdinalIgnoreCase));
+        var current = changes.Select(c => c.Path).ToList();
+        if (needsTemp)
+        {
+            for (var i = 0; i < changes.Count; i++)
+            {
+                var temp = $"~dpt-rename-{Guid.NewGuid():N}{Path.GetExtension(changes[i].Path)}";
+                var r = await services.Engine.RunAsync(new FileOperationRequest { Kind = FileOperationKind.Rename, Sources = [current[i]], NewName = temp, OwnerWindow = services.OwnerWindow });
+                if (r.Succeeded) current[i] = Path.Combine(Path.GetDirectoryName(current[i])!, temp);
+            }
+        }
+
+        var done = new List<(string, string)>();
+        for (var i = 0; i < changes.Count; i++)
+        {
+            if (activity is not null) activity.Progress = (double)i / changes.Count;
+            var target = Path.Combine(Path.GetDirectoryName(changes[i].Path)!, changes[i].NewName);
+            var r = await services.Engine.RunAsync(new FileOperationRequest { Kind = FileOperationKind.Rename, Sources = [current[i]], NewName = changes[i].NewName, OwnerWindow = services.OwnerWindow });
+            if (r.Succeeded && Exists(target)) done.Add((changes[i].Path, target));
+            else if (!string.Equals(current[i], changes[i].Path, StringComparison.OrdinalIgnoreCase))
+            {
+                // Put a temporarily renamed item back.
+                await services.Engine.RunAsync(new FileOperationRequest { Kind = FileOperationKind.Rename, Sources = [current[i]], NewName = Path.GetFileName(changes[i].Path) });
+            }
+        }
+
+        return done;
+    }
+
+    /// <summary>"Duplicate here": copies items next to themselves ("Report - Copy.pdf").</summary>
+    public async Task<FileOperationResult?> DuplicateAsync(IReadOnlyList<string> paths)
+    {
+        if (paths.Count == 0) return null;
+        var byFolder = paths.GroupBy(p => Path.GetDirectoryName(p) ?? "", StringComparer.OrdinalIgnoreCase).ToList();
+        FileOperationResult? last = null;
+        foreach (var g in byFolder) last = await CopyAsync(g.ToList(), g.Key);
+        return last;
+    }
+
     public async Task<string?> NewFolderAsync(string folder, string? name = null)
     {
         name = FileOperationEngine.UniqueName(folder, name ?? "New folder", isFolder: true);
@@ -240,6 +300,17 @@ public sealed class FileOperationsService(AppServices services)
         if (batch is null) return null;
         var entries = services.Journal.GetEntries(batch.Id).Reverse().ToList();
         var failures = 0;
+        if (entries.Count > 1 && entries.All(e => e.Kind == JournalKind.Rename && e.SourcePath is not null && e.DestPath is not null))
+        {
+            // Bulk rename: undo as one batch (handles swaps/chains with temporary names).
+            var back = entries.Where(e => Exists(e.DestPath!)).Select(e => (e.DestPath!, Path.GetFileName(e.SourcePath!))).ToList();
+            var restored = await RenameManyCoreAsync(back, null);
+            services.Journal.MarkUndone(batch.Id);
+            Notify(entries.Select(e => Path.GetDirectoryName(e.SourcePath!)!));
+            var missed = entries.Count - restored.Count;
+            return missed == 0 ? $"Undid: {batch.Title}" : $"Undid {batch.Title} ({missed} item(s) could not be restored)";
+        }
+
         var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var toRecycle = new List<string>();
 
