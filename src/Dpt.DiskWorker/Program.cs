@@ -34,4 +34,5 @@ using (var id = WindowsIdentity.GetCurrent())
     }
 }
 
+Dpt.DiskWorker.Clone.CloneEngine.Register();
 return new PlanRunner(plan, status, SafetyMode.Current).Run();

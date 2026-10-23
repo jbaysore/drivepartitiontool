@@ -41,6 +41,7 @@ public partial class App : Application
         FolderPageViewModel.Categorize = CategorizeWindow.Show;
         RulesPageViewModel.EditRule = RuleEditorWindow.EditAsync;
         DiskToolsPageViewModel.ShowAction = PartitionActionWindow.ShowAsync;
+        DiskToolsPageViewModel.ShowClone = CloneWindow.ShowAsync;
         RulesPageViewModel.PreviewRule = RulePreviewWindow.ShowAsync;
         SearchPageViewModel.CategoryResolver = services.Categories.ResolveForSearchAsync;
         services.RuleRunner.Start();

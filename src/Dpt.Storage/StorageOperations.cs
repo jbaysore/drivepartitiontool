@@ -116,6 +116,60 @@ public sealed class StorageOperations : IDisposable
         if (!SetVolumeLabel(root, label)) throw new StorageOperationException($"Couldn't set the label (error {Marshal.GetLastWin32Error()}).");
     }
 
+    /// <summary>Removes every partition and re-initializes the disk with the given style (new disk ID).</summary>
+    public void ClearAndInitialize(int disk, string style)
+    {
+        var d = Disk(disk);
+        var partitionStyle = Convert.ToUInt16(d.CimInstanceProperties["PartitionStyle"]?.Value ?? (ushort)0);
+        if (partitionStyle != 0)
+        {
+            Invoke(d, "Clear", new CimMethodParametersCollection
+            {
+                P("RemoveData", true, CimType.Boolean),
+                P("RemoveOEM", true, CimType.Boolean),
+                P("ZeroOutEntireDisk", false, CimType.Boolean),
+            });
+        }
+
+        InitializeDisk(disk, style);
+
+        // Windows may add its own reserved partition when initializing GPT; the clone recreates the source's exact layout instead.
+        foreach (var p in _session.QueryInstances(Ns, "WQL", $"SELECT * FROM MSFT_Partition WHERE DiskNumber = {disk}").ToList())
+            Invoke(p, "DeleteObject");
+    }
+
+    /// <summary>Creates an unformatted partition at an exact place with an exact type (for cloning a layout).</summary>
+    public int CreatePartitionExact(int disk, long offset, long size, string? gptType, int? mbrType, bool isActive)
+    {
+        var args = new CimMethodParametersCollection
+        {
+            P("Offset", (ulong)offset, CimType.UInt64),
+            P("Size", (ulong)size, CimType.UInt64),
+            P("AssignDriveLetter", false, CimType.Boolean),
+        };
+        if (gptType is { Length: > 0 }) args.Add(P("GptType", gptType, CimType.String));
+        if (mbrType is { } m) args.Add(P("MbrType", (ushort)m, CimType.UInt16));
+        if (isActive) args.Add(P("IsActive", true, CimType.Boolean));
+        var r = Invoke(Disk(disk), "CreatePartition", args);
+        var created = r.OutParameters["CreatedPartition"]?.Value as CimInstance
+                      ?? throw new StorageOperationException("Windows didn't report the new partition.");
+        return Convert.ToInt32(created.CimInstanceProperties["PartitionNumber"].Value);
+    }
+
+    /// <summary>Grows a partition to the largest size Windows supports (into unallocated space after it).</summary>
+    public void ExtendToMaximum(int disk, int partition)
+    {
+        var (_, max) = SupportedSize(disk, partition);
+        var current = (long)Convert.ToUInt64(Partition(disk, partition).CimInstanceProperties["Size"].Value);
+        if (max > current + 1024 * 1024) ResizePartition(disk, partition, max);
+    }
+
+    public void AddAccessPath(int disk, int partition, string path) =>
+        Invoke(Partition(disk, partition), "AddAccessPath", new CimMethodParametersCollection { P("AccessPath", path, CimType.String) });
+
+    public void RemoveAccessPath(int disk, int partition, string path) =>
+        Invoke(Partition(disk, partition), "RemoveAccessPath", new CimMethodParametersCollection { P("AccessPath", path, CimType.String) });
+
     /// <summary>Takes a disk offline/online (used while cloning so nothing else writes to the destination).</summary>
     public void SetOffline(int disk, bool offline) => Invoke(Disk(disk), offline ? "Offline" : "Online");
 
