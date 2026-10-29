@@ -26,7 +26,8 @@ public sealed class DirectoryScanner(long clusterSize)
     }
 
     /// <summary>Full scan of <paramref name="index"/>'s root. Progress is reported per top-level folder.</summary>
-    public void ScanInto(VolumeIndex index, IProgress<double>? progress, CancellationToken ct)
+    /// <param name="pauseBetweenDirectories">When set, the walk waits this long after each directory so a whole-volume scan cannot monopolize the disk.</param>
+    public void ScanInto(VolumeIndex index, IProgress<double>? progress, CancellationToken ct, TimeSpan pauseBetweenDirectories = default)
     {
         index.BeginBulk(64 * 1024);
         var rootRef = NewRef();
@@ -47,6 +48,13 @@ public sealed class DirectoryScanner(long clusterSize)
         while (queue.Count > 0)
         {
             ct.ThrowIfCancellationRequested();
+            if (pauseBetweenDirectories > TimeSpan.Zero)
+            {
+                if (ct.CanBeCanceled) ct.WaitHandle.WaitOne(pauseBetweenDirectories);
+                else Thread.Sleep(pauseBetweenDirectories);
+                ct.ThrowIfCancellationRequested();
+            }
+
             var (path, parentRef) = queue.Pop();
             if (topLevel.Contains(parentRef)) progress?.Report(0.99 * done++ / topCount);
             foreach (var it in List(path))

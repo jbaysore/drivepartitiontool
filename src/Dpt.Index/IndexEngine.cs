@@ -277,6 +277,12 @@ public static class Diagnostics
 /// <summary>Keeps one volume's index current in the background.</summary>
 internal sealed class VolumeWorker : IDisposable
 {
+    /// <summary>One whole-volume walk at a time. Folder scans do not take this gate.</summary>
+    private static readonly SemaphoreSlim VolumeWalkGate = new(1, 1);
+
+    private const int ThreadModeBackgroundBegin = 0x00010000;
+    private const int ThreadModeBackgroundEnd = 0x00020000;
+
     private readonly IndexEngine _engine;
     private readonly bool _useMft;
     private readonly CancellationTokenSource _cts = new();
@@ -504,12 +510,25 @@ internal sealed class VolumeWorker : IDisposable
 
     private async Task RunScan(CancellationToken ct)
     {
+        var explicitRebuild = _rebuild;
         var scanner = new DirectoryScanner(ClusterSize(Root));
         var index = new VolumeIndex(Root, Serial, FileSystem, Label);
-        var fromSnapshot = !_rebuild && TryLoadSnapshot(index);
+        var fromSnapshot = !explicitRebuild && TryLoadSnapshot(index);
+        var kind = CatalogScanPolicy.Decide(Root, fromSnapshot, explicitRebuild);
+
+        if (kind == CatalogScanKind.ServeSnapshot)
+        {
+            Index = index;
+            _rebuild = false;
+            _dirty = false;
+            SetState(VolumeState.Ready, 1, CatalogScanPolicy.SavedCatalogMessage);
+            await WaitForRebuildOrShutdown(ct);
+            return;
+        }
+
         if (fromSnapshot)
         {
-            // Serve the snapshot immediately, refresh in the background.
+            // Folder roots: serve the snapshot immediately, refresh in the background.
             Index = index;
             SetState(VolumeState.Scanning, 0.5, "Refreshing");
         }
@@ -519,25 +538,65 @@ internal sealed class VolumeWorker : IDisposable
         }
 
         var queue = new ConcurrentQueue<(WatcherChangeTypes Type, string Path, string? Old)>();
-        using var watcher = CreateWatcher(queue);
+        using var watcher = kind == CatalogScanKind.WatchedFolder ? CreateWatcher(queue) : null;
         var fresh = new VolumeIndex(Root, Serial, FileSystem, Label);
-        await Task.Run(() => scanner.ScanInto(fresh, fromSnapshot ? null : new Progress(this), ct), ct);
+        if (kind == CatalogScanKind.ThrottledWalk)
+            await WalkVolume(scanner, fresh, ct);
+        else
+            await Task.Run(() => scanner.ScanInto(fresh, fromSnapshot ? null : new Progress(this), ct), ct);
+
         fresh.LastUpdatedUtc = DateTime.UtcNow;
         Index = fresh;
         index = fresh;
         _rebuild = false;
         _dirty = true;
-        SetState(VolumeState.Ready, 1);
+        SetState(VolumeState.Ready, 1, kind == CatalogScanKind.ThrottledWalk ? CatalogScanPolicy.SavedCatalogMessage : null);
 
         while (!ct.IsCancellationRequested)
         {
-            if (!queue.IsEmpty) ApplyWatcher(scanner, index, queue);
+            if (watcher is not null && !queue.IsEmpty) ApplyWatcher(scanner, index, queue);
             if (_rebuild) throw new RebuildRequestedException();
             MaybeSnapshot(index);
-            await Task.Delay(Math.Min(500, (int)_engine.Options.PollInterval.TotalMilliseconds), ct);
+            await Task.Delay(PollDelay, ct);
         }
 
         SaveSnapshot(index);
+    }
+
+    private async Task WaitForRebuildOrShutdown(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            if (_rebuild) throw new RebuildRequestedException();
+            await Task.Delay(PollDelay, ct);
+        }
+    }
+
+    private int PollDelay => Math.Min(500, (int)_engine.Options.PollInterval.TotalMilliseconds);
+
+    /// <summary>Walks one whole volume at background CPU and I/O priority. Other volume walks wait.</summary>
+    private async Task WalkVolume(DirectoryScanner scanner, VolumeIndex fresh, CancellationToken ct)
+    {
+        await VolumeWalkGate.WaitAsync(ct);
+        try
+        {
+            await Task.Run(() =>
+            {
+                var background = SetThreadPriority(GetCurrentThread(), ThreadModeBackgroundBegin);
+                try
+                {
+                    scanner.ScanInto(fresh, new Progress(this), ct, CatalogScanPolicy.VolumeWalkPause);
+                }
+                finally
+                {
+                    if (background) SetThreadPriority(GetCurrentThread(), ThreadModeBackgroundEnd);
+                }
+            }, ct);
+        }
+        finally
+        {
+            VolumeWalkGate.Release();
+        }
     }
 
     private FileSystemWatcher? CreateWatcher(ConcurrentQueue<(WatcherChangeTypes, string, string?)> queue)
@@ -547,14 +606,19 @@ internal sealed class VolumeWorker : IDisposable
             var w = new FileSystemWatcher(Root)
             {
                 IncludeSubdirectories = true,
-                InternalBufferSize = 256 * 1024,
+                InternalBufferSize = CatalogScanPolicy.WatcherBufferBytes,
                 NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.Size | NotifyFilters.LastWrite | NotifyFilters.Attributes,
             };
             w.Created += (_, e) => queue.Enqueue((WatcherChangeTypes.Created, e.FullPath, null));
             w.Deleted += (_, e) => queue.Enqueue((WatcherChangeTypes.Deleted, e.FullPath, null));
             w.Changed += (_, e) => queue.Enqueue((WatcherChangeTypes.Changed, e.FullPath, null));
             w.Renamed += (_, e) => queue.Enqueue((WatcherChangeTypes.Renamed, e.FullPath, e.OldFullPath));
-            w.Error += (_, _) => _rebuild = true;
+            // A missed burst leaves the catalog as it is. Restarting a whole-volume walk from here is what stalled the machine.
+            w.Error += (_, _) =>
+            {
+                _message = "Missed some changes";
+                _engine.RaiseStatus();
+            };
             w.EnableRaisingEvents = true;
             return w;
         }
@@ -641,6 +705,12 @@ internal sealed class VolumeWorker : IDisposable
 
     [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
     private static extern bool GetDiskFreeSpace(string root, out uint sectorsPerCluster, out uint bytesPerSector, out uint free, out uint total);
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    private static extern IntPtr GetCurrentThread();
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    private static extern bool SetThreadPriority(IntPtr hThread, int nPriority);
 
     // ---------------- Snapshots ----------------
 

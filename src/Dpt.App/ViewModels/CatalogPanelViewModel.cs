@@ -17,7 +17,11 @@ public sealed partial class VolumeRowViewModel(VolumeStatus status, Action<Volum
 
     public string StateText => Status.State switch
     {
-        VolumeState.Ready => $"Ready · {Status.Items:N0} items · {(Status.Mode == "MFT" ? "instant updates" : "updates while the app is open")}",
+        VolumeState.Ready => Status.Mode == "MFT"
+            ? $"Ready · {Status.Items:N0} items · instant updates"
+            : string.IsNullOrEmpty(Status.Message)
+                ? $"Ready · {Status.Items:N0} items · updates while the app is open"
+                : $"Ready · {Status.Items:N0} items · {Status.Message}",
         VolumeState.Scanning => $"Scanning… {Status.Progress:P0} · {Status.Items:N0} items",
         VolumeState.Waiting => "Waiting",
         VolumeState.NotSelected => "Not searched",

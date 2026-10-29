@@ -93,7 +93,7 @@ public sealed class AppSettings
     [Setting("Search", "Include hidden items in search", "Includes hidden files and folders in search results.", Order = 3)]
     public bool SearchIncludeHidden { get; set; } = false;
 
-    [Setting("Search", "Build the catalog inside the app", "When the background search service isn't installed, the app builds and updates the search catalog itself while it's open (slower first scan).", Order = 5)]
+    [Setting("Search", "Build the catalog inside the app", "When the background search service isn't installed, the app uses its saved catalog while it's open. Whole drives are not rescanned on startup.", Order = 5)]
     public bool UseLocalCatalog { get; set; } = true;
 
     [Setting("Search", "Show search previews", "Shows a preview pane beside search results (Alt+P toggles it).", Order = 6)]
